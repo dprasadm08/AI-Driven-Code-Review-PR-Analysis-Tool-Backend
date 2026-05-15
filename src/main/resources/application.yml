@@ -1,1 +1,46 @@
-# application.yml
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: ai-pr-review-backend
+  
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/ai-pr-review
+      auto-index-creation: true
+  
+  security:
+    user:
+      name: admin
+      password: admin123
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    expiration: 86400000  # 24 hours in milliseconds
+  
+  github:
+    api:
+      base-url: https://api.github.com
+      timeout: 30000  # 30 seconds
+  
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      model: gpt-4
+      base-url: https://api.openai.com/v1
+    
+    claude:
+      api-key: ${CLAUDE_API_KEY:}
+      model: claude-3-5-sonnet-20241022
+      base-url: https://api.anthropic.com/v1
+
+logging:
+  level:
+    root: INFO
+    com.aiprreview: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
