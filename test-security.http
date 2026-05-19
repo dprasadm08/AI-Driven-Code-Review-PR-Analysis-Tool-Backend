@@ -1,0 +1,248 @@
+### Spring Security & Protected Endpoints Tests
+### This file tests JWT authentication and authorization
+
+### Variables (Update these after signup/login)
+@baseUrl = http://localhost:8080/api
+@token = eyJhbGciOiJIUzI1NiJ9.YOUR_JWT_TOKEN_HERE
+
+###############################################
+### PUBLIC ENDPOINTS (No Authentication)
+###############################################
+
+### 1. Health Check (Public)
+GET {{baseUrl}}/health
+Accept: application/json
+
+###
+
+### 2. Signup (Public)
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "username": "securitytest",
+  "email": "security@example.com",
+  "password": "test123456",
+  "fullName": "Security Test User"
+}
+
+###
+
+### 3. Login (Public)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "usernameOrEmail": "securitytest",
+  "password": "test123456"
+}
+
+###
+
+###############################################
+### PROTECTED ENDPOINTS - Without Token (Should Fail with 401)
+###############################################
+
+### 4. Get Current User - No Token (Should return 401)
+GET {{baseUrl}}/auth/me
+Accept: application/json
+
+###
+
+### 5. Get Repositories - No Token (Should return 401)
+GET {{baseUrl}}/repositories
+Accept: application/json
+
+###
+
+### 6. Get Pull Requests - No Token (Should return 401)
+GET {{baseUrl}}/pull-requests
+Accept: application/json
+
+###
+
+### 7. Trigger Analysis - No Token (Should return 401)
+POST {{baseUrl}}/analysis/trigger
+Content-Type: application/json
+
+{
+  "prId": "12345"
+}
+
+###
+
+###############################################
+### PROTECTED ENDPOINTS - With Invalid Token (Should Fail with 401)
+###############################################
+
+### 8. Get Current User - Invalid Token (Should return 401)
+GET {{baseUrl}}/auth/me
+Accept: application/json
+Authorization: Bearer invalid.jwt.token
+
+###
+
+### 9. Get Repositories - Invalid Token (Should return 401)
+GET {{baseUrl}}/repositories
+Accept: application/json
+Authorization: Bearer invalid.token.here
+
+###
+
+###############################################
+### PROTECTED ENDPOINTS - With Valid Token (Should Succeed with 200)
+###############################################
+
+### 10. Get Current User - With Valid Token
+GET {{baseUrl}}/auth/me
+Accept: application/json
+Authorization: Bearer {{token}}
+
+###
+
+### 11. Get All Repositories - With Valid Token
+GET {{baseUrl}}/repositories
+Accept: application/json
+Authorization: Bearer {{token}}
+
+###
+
+### 12. Get Repository by ID - With Valid Token
+GET {{baseUrl}}/repositories/repo123
+Accept: application/json
+Authorization: Bearer {{token}}
+
+###
+
+### 13. Add Repository - With Valid Token
+POST {{baseUrl}}/repositories
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "test-repo",
+  "url": "https://github.com/user/repo"
+}
+
+###
+
+### 14. Get All Pull Requests - With Valid Token
+GET {{baseUrl}}/pull-requests
+Accept: application/json
+Authorization: Bearer {{token}}
+
+###
+
+### 15. Get Pull Request by ID - With Valid Token
+GET {{baseUrl}}/pull-requests/pr123
+Accept: application/json
+Authorization: Bearer {{token}}
+
+###
+
+### 16. Get Pull Requests by Repository - With Valid Token
+GET {{baseUrl}}/pull-requests/repository/repo123
+Accept: application/json
+Authorization: Bearer {{token}}
+
+###
+
+### 17. Trigger AI Analysis - With Valid Token
+POST {{baseUrl}}/analysis/trigger
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "prId": "pr123",
+  "repository": "test-repo"
+}
+
+###
+
+### 18. Get Analysis Results - With Valid Token
+GET {{baseUrl}}/analysis/results/pr123
+Accept: application/json
+Authorization: Bearer {{token}}
+
+###
+
+### 19. Get Analysis Status - With Valid Token
+GET {{baseUrl}}/analysis/status/analysis123
+Accept: application/json
+Authorization: Bearer {{token}}
+
+###
+
+###############################################
+### EDGE CASES
+###############################################
+
+### 20. Malformed Authorization Header (Should return 401)
+GET {{baseUrl}}/auth/me
+Accept: application/json
+Authorization: InvalidFormat
+
+###
+
+### 21. Bearer Token with Extra Spaces (Should handle gracefully)
+GET {{baseUrl}}/auth/me
+Accept: application/json
+Authorization: Bearer  {{token}}
+
+###
+
+### 22. Empty Authorization Header (Should return 401)
+GET {{baseUrl}}/auth/me
+Accept: application/json
+Authorization: 
+
+###
+
+### 23. Expired Token Test (Should return 401)
+# Note: Use a token that's older than 24 hours
+GET {{baseUrl}}/auth/me
+Accept: application/json
+Authorization: Bearer EXPIRED_TOKEN_HERE
+
+###
+
+###############################################
+### CORS Tests (From Different Origins)
+###############################################
+
+### 24. OPTIONS Request (CORS Preflight)
+OPTIONS {{baseUrl}}/repositories
+Origin: http://localhost:3000
+Access-Control-Request-Method: GET
+Access-Control-Request-Headers: Authorization
+
+###
+
+###############################################
+### TESTING INSTRUCTIONS
+###############################################
+
+# STEP 1: Start the application
+# .\mvnw.cmd spring-boot:run
+
+# STEP 2: Test public endpoints (1-3)
+# Should work without authentication
+
+# STEP 3: Get JWT token from login response (Test #3)
+# Copy the accessToken value
+
+# STEP 4: Update @token variable at top with your JWT token
+
+# STEP 5: Test protected endpoints without token (4-7)
+# All should return 401 Unauthorized
+
+# STEP 6: Test protected endpoints with invalid token (8-9)
+# All should return 401 Unauthorized
+
+# STEP 7: Test protected endpoints with valid token (10-19)
+# All should return 200 OK with data
+
+# STEP 8: Test edge cases (20-23)
+# Should handle gracefully with proper error messages
+
+###
