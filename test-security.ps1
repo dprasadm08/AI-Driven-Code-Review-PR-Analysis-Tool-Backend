@@ -63,7 +63,8 @@ try {
 Write-Host "`nTest 3: Protected Endpoint WITHOUT Token" -ForegroundColor Yellow
 Write-Host "──────────────────────────────────────" -ForegroundColor Gray
 try {
-    $response = Invoke-RestMethod -Uri "$baseUrl/repositories" -Method Get
+    # Attempt to access without token - should fail with 401
+    Invoke-RestMethod -Uri "$baseUrl/repositories" -Method Get | Out-Null
     Write-Host "❌ SECURITY ISSUE: Endpoint accessible without token!" -ForegroundColor Red
 } catch {
     if ($_.Exception.Response.StatusCode -eq 401) {
@@ -78,7 +79,8 @@ Write-Host "`nTest 4: Protected Endpoint WITH Invalid Token" -ForegroundColor Ye
 Write-Host "──────────────────────────────────────" -ForegroundColor Gray
 $invalidHeaders = @{ Authorization = "Bearer invalid.token.here" }
 try {
-    $response = Invoke-RestMethod -Uri "$baseUrl/repositories" -Method Get -Headers $invalidHeaders
+    # Attempt with invalid token - should fail with 401
+    Invoke-RestMethod -Uri "$baseUrl/repositories" -Method Get -Headers $invalidHeaders | Out-Null
     Write-Host "❌ SECURITY ISSUE: Invalid token accepted!" -ForegroundColor Red
 } catch {
     if ($_.Exception.Response.StatusCode -eq 401) {
@@ -153,8 +155,9 @@ try {
 
 # 5h: Get Analysis Results
 try {
-    $results = Invoke-RestMethod -Uri "$baseUrl/analysis/results/pr123" -Method Get -Headers $validHeaders
-    Write-Host "✅ GET /analysis/results/{id} - Retrieved" -ForegroundColor Green
+    $analysisResults = Invoke-RestMethod -Uri "$baseUrl/analysis/results/pr123" -Method Get -Headers $validHeaders
+    # Verify we got results back
+    Write-Host "✅ GET /analysis/results/{id} - Retrieved (PR: $($analysisResults.prId))" -ForegroundColor Green
 } catch {
     Write-Host "❌ GET /analysis/results/{id} - Failed: $($_.Exception.Message)" -ForegroundColor Red
 }
@@ -166,7 +169,8 @@ Write-Host "──────────────────────�
 # 6a: Malformed header
 $malformedHeaders = @{ Authorization = "InvalidFormat" }
 try {
-    $response = Invoke-RestMethod -Uri "$baseUrl/auth/me" -Method Get -Headers $malformedHeaders
+    # Test with malformed Authorization header - should fail
+    Invoke-RestMethod -Uri "$baseUrl/auth/me" -Method Get -Headers $malformedHeaders | Out-Null
     Write-Host "❌ Malformed header accepted!" -ForegroundColor Red
 } catch {
     if ($_.Exception.Response.StatusCode -eq 401) {
@@ -177,7 +181,8 @@ try {
 # 6b: Empty token
 $emptyHeaders = @{ Authorization = "Bearer " }
 try {
-    $response = Invoke-RestMethod -Uri "$baseUrl/auth/me" -Method Get -Headers $emptyHeaders
+    # Test with empty Bearer token - should fail
+    Invoke-RestMethod -Uri "$baseUrl/auth/me" -Method Get -Headers $emptyHeaders | Out-Null
     Write-Host "❌ Empty token accepted!" -ForegroundColor Red
 } catch {
     if ($_.Exception.Response.StatusCode -eq 401) {

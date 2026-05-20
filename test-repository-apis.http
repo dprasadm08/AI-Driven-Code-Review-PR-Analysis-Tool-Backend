@@ -1,0 +1,185 @@
+### Repository Management API Tests
+
+@baseUrl = http://localhost:8080/api
+@token = YOUR_JWT_TOKEN_HERE
+
+###############################################
+### SETUP: Login first to get token
+###############################################
+
+### 1. Login to get JWT token
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "usernameOrEmail": "testuser",
+  "password": "password123"
+}
+
+###
+
+###############################################
+### REPOSITORY CRUD OPERATIONS
+###############################################
+
+### 2. Add Repository (Manual)
+POST {{baseUrl}}/repositories
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "fullName": "octocat/Hello-World",
+  "description": "My first repository on GitHub",
+  "defaultBranch": "main",
+  "enableWebhook": false
+}
+
+###
+
+### 3. Add Another Repository
+POST {{baseUrl}}/repositories
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "fullName": "microsoft/vscode",
+  "description": "Visual Studio Code",
+  "defaultBranch": "main",
+  "enableWebhook": true
+}
+
+###
+
+### 4. Get All Repositories
+GET {{baseUrl}}/repositories
+Authorization: Bearer {{token}}
+
+###
+
+### 5. Get Active Repositories Only
+GET {{baseUrl}}/repositories?activeOnly=true
+Authorization: Bearer {{token}}
+
+###
+
+### 6. Get Repository by ID (Replace with actual ID from create response)
+GET {{baseUrl}}/repositories/663f7b8a9e4c1d2a3b4c5d6e
+Authorization: Bearer {{token}}
+
+###
+
+### 7. Get Repository by Full Name
+GET {{baseUrl}}/repositories/name/octocat/Hello-World
+Authorization: Bearer {{token}}
+
+###
+
+### 8. Update Repository
+PUT {{baseUrl}}/repositories/663f7b8a9e4c1d2a3b4c5d6e
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "description": "Updated description for my repository",
+  "defaultBranch": "develop",
+  "enableWebhook": true
+}
+
+###
+
+### 9. Toggle Repository Status (Active/Inactive)
+PATCH {{baseUrl}}/repositories/663f7b8a9e4c1d2a3b4c5d6e/toggle-status
+Authorization: Bearer {{token}}
+
+###
+
+### 10. Get Repository Count
+GET {{baseUrl}}/repositories/count
+Authorization: Bearer {{token}}
+
+###
+
+### 11. Search Repositories
+GET {{baseUrl}}/repositories/search?query=hello
+Authorization: Bearer {{token}}
+
+###
+
+### 12. Delete Repository
+DELETE {{baseUrl}}/repositories/663f7b8a9e4c1d2a3b4c5d6e
+Authorization: Bearer {{token}}
+
+###
+
+###############################################
+### VALIDATION TESTS
+###############################################
+
+### 13. Add Repository - Invalid Format (Should Fail)
+POST {{baseUrl}}/repositories
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "fullName": "invalid-repo-name",
+  "description": "This should fail"
+}
+
+###
+
+### 14. Add Repository - Missing Required Field (Should Fail)
+POST {{baseUrl}}/repositories
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "description": "Missing fullName field"
+}
+
+###
+
+### 15. Add Duplicate Repository (Should Fail)
+POST {{baseUrl}}/repositories
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "fullName": "octocat/Hello-World",
+  "description": "Duplicate repository"
+}
+
+###
+
+###############################################
+### UNAUTHORIZED TESTS (No Token)
+###############################################
+
+### 16. Get Repositories - No Token (Should return 401)
+GET {{baseUrl}}/repositories
+
+###
+
+### 17. Add Repository - No Token (Should return 401)
+POST {{baseUrl}}/repositories
+Content-Type: application/json
+
+{
+  "fullName": "owner/repo",
+  "description": "Test"
+}
+
+###
+
+###############################################
+### TESTING WORKFLOW
+###############################################
+
+# STEP 1: Login and get JWT token (Test #1)
+# STEP 2: Copy the accessToken
+# STEP 3: Update @token variable at top
+# STEP 4: Add repositories (Tests #2, #3)
+# STEP 5: Get repository ID from response
+# STEP 6: Test all CRUD operations
+# STEP 7: Test validation and error cases
+
+###
