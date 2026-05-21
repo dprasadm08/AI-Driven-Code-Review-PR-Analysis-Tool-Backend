@@ -2,6 +2,7 @@ package com.aiprreview.controller;
 
 import com.aiprreview.dto.repository.RepositoryRequest;
 import com.aiprreview.dto.repository.RepositoryResponse;
+import com.aiprreview.service.GithubService;
 import com.aiprreview.service.RepositoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ import java.util.Map;
 public class RepositoryController {
 
     private final RepositoryService repositoryService;
+    private final GithubService githubService;
 
     @PostMapping
     @PreAuthorize("hasRole('USER')")
@@ -150,5 +152,42 @@ public class RepositoryController {
         log.info("Searching repositories with query: {}", query);
         List<RepositoryResponse> repositories = repositoryService.searchRepositories(query);
         return ResponseEntity.ok(repositories);
+    }
+
+    @PostMapping("/sync/github")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> syncGithubRepositories(
+            @RequestParam(required = false) String token) {
+        try {
+            log.info("Syncing repositories from GitHub");
+            List<RepositoryResponse> repositories = githubService.syncUserRepositories(token);
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Successfully synced repositories from GitHub");
+            response.put("count", repositories.size());
+            response.put("repositories", repositories);
+            return ResponseEntity.ok(response);
+        } catch (Exception ex) {
+            log.error("Failed to sync GitHub repositories: {}", ex.getMessage());
+            Map<String, String> error = new HashMap<>();
+            error.put("error", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+    }
+
+    @PostMapping("/sync/github/repo")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> fetchGithubRepository(
+            @RequestParam String fullName,
+            @RequestParam(required = false) String token) {
+        try {
+            log.info("Fetching repository from GitHub: {}", fullName);
+            RepositoryResponse repository = githubService.fetchAndSaveRepository(fullName, token);
+            return ResponseEntity.status(HttpStatus.CREATED).body(repository);
+        } catch (Exception ex) {
+            log.error("Failed to fetch GitHub repository: {}", ex.getMessage());
+            Map<String, String> error = new HashMap<>();
+            error.put("error", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
     }
 }

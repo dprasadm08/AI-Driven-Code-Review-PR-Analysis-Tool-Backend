@@ -1,0 +1,201 @@
+### GitHub Repository Integration API Tests
+
+@baseUrl = http://localhost:8080/api
+@token = YOUR_JWT_TOKEN_HERE
+@githubToken = YOUR_GITHUB_TOKEN_HERE
+
+###############################################
+### SETUP: Login first to get token
+###############################################
+
+### 1. Login to get JWT token
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "usernameOrEmail": "testuser",
+  "password": "password123"
+}
+
+###
+
+###############################################
+### GITHUB INTEGRATION - Fetch Repositories
+###############################################
+
+### 2. Sync All Repositories from GitHub
+# This fetches all repositories from your GitHub account and saves them
+POST {{baseUrl}}/repositories/sync/github
+Authorization: Bearer {{token}}
+
+###
+
+### 3. Sync Repositories with Explicit GitHub Token
+POST {{baseUrl}}/repositories/sync/github?token={{githubToken}}
+Authorization: Bearer {{token}}
+
+###
+
+### 4. Fetch Specific Repository from GitHub
+# Format: owner/repo-name
+POST {{baseUrl}}/repositories/sync/github/repo?fullName=octocat/Hello-World
+Authorization: Bearer {{token}}
+
+###
+
+### 5. Fetch Specific Repository with GitHub Token
+POST {{baseUrl}}/repositories/sync/github/repo?fullName=microsoft/vscode&token={{githubToken}}
+Authorization: Bearer {{token}}
+
+###
+
+### 6. Fetch Your Own Repository
+POST {{baseUrl}}/repositories/sync/github/repo?fullName=YOUR_USERNAME/YOUR_REPO
+Authorization: Bearer {{token}}
+
+###
+
+###############################################
+### VERIFY SYNCED REPOSITORIES
+###############################################
+
+### 7. Get All Synced Repositories
+GET {{baseUrl}}/repositories
+Authorization: Bearer {{token}}
+
+###
+
+### 8. Get Repository by ID (Use ID from sync response)
+GET {{baseUrl}}/repositories/663f7b8a9e4c1d2a3b4c5d6e
+Authorization: Bearer {{token}}
+
+###
+
+### 9. Search Synced Repositories
+GET {{baseUrl}}/repositories/search?query=hello
+Authorization: Bearer {{token}}
+
+###
+
+### 10. Get Repository Count
+GET {{baseUrl}}/repositories/count
+Authorization: Bearer {{token}}
+
+###
+
+###############################################
+### ERROR CASES
+###############################################
+
+### 11. Sync Without GitHub Token (Should Fail if not set in profile)
+POST {{baseUrl}}/repositories/sync/github
+Authorization: Bearer {{token}}
+
+###
+
+### 12. Fetch Non-Existent Repository (Should Fail)
+POST {{baseUrl}}/repositories/sync/github/repo?fullName=invalid/nonexistent-repo-xyz
+Authorization: Bearer {{token}}
+
+###
+
+### 13. Fetch with Invalid Format (Should Fail)
+POST {{baseUrl}}/repositories/sync/github/repo?fullName=invalid-format
+Authorization: Bearer {{token}}
+
+###
+
+### 14. Sync Without Authentication (Should return 401)
+POST {{baseUrl}}/repositories/sync/github
+
+###
+
+###############################################
+### UPDATE USER PROFILE WITH GITHUB TOKEN
+###############################################
+
+### 15. Update User with GitHub Token
+# First, you need an endpoint to update user profile
+# This is a placeholder - implement if needed
+PUT {{baseUrl}}/users/profile
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "githubToken": "ghp_your_github_personal_access_token_here"
+}
+
+###
+
+###############################################
+### TESTING WORKFLOW
+###############################################
+
+# STEP 1: Get GitHub Personal Access Token
+#   - Go to GitHub.com → Settings → Developer Settings → Personal Access Tokens
+#   - Generate new token with 'repo' scope
+#   - Copy the token
+
+# STEP 2: Login and get JWT token (Test #1)
+#   - Copy the accessToken
+
+# STEP 3: Update @token and @githubToken variables at top
+
+# STEP 4: Sync all repositories from GitHub (Test #2 or #3)
+#   - This will fetch all your repositories
+
+# STEP 5: Verify synced repositories (Tests #7-10)
+
+# STEP 6: Fetch specific repository (Tests #4-6)
+
+# STEP 7: Test error cases (Tests #11-14)
+
+###
+
+###############################################
+### EXPECTED RESPONSES
+###############################################
+
+# Successful Sync (Test #2):
+# {
+#   "message": "Successfully synced repositories from GitHub",
+#   "count": 5,
+#   "repositories": [
+#     {
+#       "id": "...",
+#       "name": "Hello-World",
+#       "fullName": "octocat/Hello-World",
+#       "owner": "octocat",
+#       "url": "https://github.com/octocat/Hello-World",
+#       "description": "My first repository",
+#       "defaultBranch": "main",
+#       "language": "JavaScript",
+#       "stars": 1234,
+#       "forks": 567,
+#       "openIssues": 10,
+#       "isPrivate": false,
+#       "githubId": 123456789,
+#       "lastSyncedAt": "2026-05-21T10:30:00"
+#     }
+#   ]
+# }
+
+# Successful Fetch (Test #4):
+# {
+#   "id": "...",
+#   "name": "Hello-World",
+#   "fullName": "octocat/Hello-World",
+#   ...
+# }
+
+# Error - No Token (Test #11):
+# {
+#   "error": "GitHub token is required. Please provide a token or set it in your profile."
+# }
+
+# Error - Repository Not Found (Test #12):
+# {
+#   "error": "Repository not found: invalid/nonexistent-repo-xyz"
+# }
+
+###

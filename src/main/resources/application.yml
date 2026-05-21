@@ -25,7 +25,9 @@ app:
   github:
     api:
       base-url: https://api.github.com
+      token: ${GITHUB_TOKEN:}  # Set via environment variable or here
       timeout: 30000  # 30 seconds
+      per-page: 30  # Results per page
   
   ai:
     openai:

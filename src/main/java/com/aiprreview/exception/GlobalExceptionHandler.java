@@ -58,6 +58,12 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(GithubApiException.class)
+    public ResponseEntity<Map<String, Object>> handleGithubApiException(GithubApiException ex) {
+        log.error("GitHub API error: {}", ex.getMessage());
+        return buildErrorResponse(ex.getMessage(), HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGlobalException(Exception ex) {
         log.error("Unexpected error occurred", ex);
