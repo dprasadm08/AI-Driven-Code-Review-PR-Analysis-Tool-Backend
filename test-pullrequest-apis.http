@@ -1,0 +1,293 @@
+### Pull Request API Tests
+
+@baseUrl = http://localhost:8080/api
+@token = YOUR_JWT_TOKEN_HERE
+@githubToken = YOUR_GITHUB_TOKEN_HERE
+@repoId = YOUR_REPOSITORY_ID_HERE
+
+###############################################
+### SETUP: Login first to get token
+###############################################
+
+### 1. Login to get JWT token
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "usernameOrEmail": "testuser",
+  "password": "password123"
+}
+
+###
+
+###############################################
+### SYNC PULL REQUESTS FROM GITHUB
+###############################################
+
+### 2. Sync All Pull Requests for a Repository
+# This fetches all PRs (open, closed, merged) from GitHub
+POST {{baseUrl}}/pull-requests/repository/{{repoId}}/sync
+Authorization: Bearer {{token}}
+
+###
+
+### 3. Sync Only Open Pull Requests
+POST {{baseUrl}}/pull-requests/repository/{{repoId}}/sync?state=open
+Authorization: Bearer {{token}}
+
+###
+
+### 4. Sync Only Closed Pull Requests
+POST {{baseUrl}}/pull-requests/repository/{{repoId}}/sync?state=closed
+Authorization: Bearer {{token}}
+
+###
+
+### 5. Sync with Explicit GitHub Token
+POST {{baseUrl}}/pull-requests/repository/{{repoId}}/sync?state=all&token={{githubToken}}
+Authorization: Bearer {{token}}
+
+###
+
+### 6. Fetch Specific Pull Request by Number
+# Example: Fetch PR #1
+POST {{baseUrl}}/pull-requests/repository/{{repoId}}/fetch/1
+Authorization: Bearer {{token}}
+
+###
+
+### 7. Fetch Specific PR with GitHub Token
+POST {{baseUrl}}/pull-requests/repository/{{repoId}}/fetch/2?token={{githubToken}}
+Authorization: Bearer {{token}}
+
+###
+
+###############################################
+### LIST PULL REQUESTS
+###############################################
+
+### 8. Get All Pull Requests for Current User
+GET {{baseUrl}}/pull-requests
+Authorization: Bearer {{token}}
+
+###
+
+### 9. Get Open Pull Requests
+GET {{baseUrl}}/pull-requests?state=open
+Authorization: Bearer {{token}}
+
+###
+
+### 10. Get Merged Pull Requests
+GET {{baseUrl}}/pull-requests?state=merged
+Authorization: Bearer {{token}}
+
+###
+
+### 11. Get Closed Pull Requests
+GET {{baseUrl}}/pull-requests?state=closed
+Authorization: Bearer {{token}}
+
+###
+
+### 12. Get All Pull Requests for Specific Repository
+GET {{baseUrl}}/pull-requests/repository/{{repoId}}
+Authorization: Bearer {{token}}
+
+###
+
+### 13. Get Open PRs for Specific Repository
+GET {{baseUrl}}/pull-requests/repository/{{repoId}}?state=open
+Authorization: Bearer {{token}}
+
+###
+
+### 14. Get Pull Request by ID (Use ID from previous responses)
+GET {{baseUrl}}/pull-requests/663f7b8a9e4c1d2a3b4c5d6e
+Authorization: Bearer {{token}}
+
+###
+
+###############################################
+### STATISTICS & COUNTS
+###############################################
+
+### 15. Get Total Pull Request Count
+GET {{baseUrl}}/pull-requests/count
+Authorization: Bearer {{token}}
+
+###
+
+### 16. Get Open PR Count
+GET {{baseUrl}}/pull-requests/count?state=open
+Authorization: Bearer {{token}}
+
+###
+
+### 17. Get Repository PR Count
+GET {{baseUrl}}/pull-requests/repository/{{repoId}}/count
+Authorization: Bearer {{token}}
+
+###
+
+### 18. Get Repository Open PR Count
+GET {{baseUrl}}/pull-requests/repository/{{repoId}}/count?state=open
+Authorization: Bearer {{token}}
+
+###
+
+###############################################
+### ERROR CASES
+###############################################
+
+### 19. Sync Without GitHub Token (Should Fail if not in profile)
+POST {{baseUrl}}/pull-requests/repository/{{repoId}}/sync
+Authorization: Bearer {{token}}
+
+###
+
+### 20. Fetch Non-Existent PR (Should Fail)
+POST {{baseUrl}}/pull-requests/repository/{{repoId}}/fetch/99999
+Authorization: Bearer {{token}}
+
+###
+
+### 21. Access Without Authentication (Should return 401)
+GET {{baseUrl}}/pull-requests
+
+###
+
+### 22. Access Repository You Don't Own (Should Fail)
+GET {{baseUrl}}/pull-requests/repository/invalid-repo-id
+Authorization: Bearer {{token}}
+
+###
+
+###############################################
+### TESTING WORKFLOW
+###############################################
+
+# STEP 1: Setup
+#   - Get GitHub Personal Access Token with 'repo' scope
+#   - Login and get JWT token (Test #1)
+#   - Get a repository ID from /repositories endpoint
+
+# STEP 2: Update Variables
+#   - Set @token to your JWT token
+#   - Set @githubToken to your GitHub token
+#   - Set @repoId to a valid repository ID
+
+# STEP 3: Sync Pull Requests (Tests #2-7)
+#   - This will fetch PRs from GitHub and save them
+
+# STEP 4: List Pull Requests (Tests #8-14)
+#   - View the synced PRs in various ways
+
+# STEP 5: Get Statistics (Tests #15-18)
+#   - Check counts and stats
+
+# STEP 6: Test Error Cases (Tests #19-22)
+
+###
+
+###############################################
+### EXPECTED RESPONSES
+###############################################
+
+# Successful Sync (Test #2):
+# {
+#   "message": "Successfully synced pull requests from GitHub",
+#   "count": 3,
+#   "pullRequests": [
+#     {
+#       "id": "...",
+#       "repositoryId": "...",
+#       "repositoryName": "my-repo",
+#       "githubId": 1234567890,
+#       "prNumber": 1,
+#       "title": "Add new feature",
+#       "description": "This PR adds a new feature...",
+#       "state": "open",
+#       "author": "johndoe",
+#       "authorAvatarUrl": "https://avatars.githubusercontent.com/u/...",
+#       "htmlUrl": "https://github.com/owner/repo/pull/1",
+#       "headBranch": "feature-branch",
+#       "baseBranch": "main",
+#       "isDraft": false,
+#       "isMerged": false,
+#       "isMergeable": true,
+#       "commentsCount": 5,
+#       "reviewCommentsCount": 3,
+#       "commitsCount": 10,
+#       "additions": 150,
+#       "deletions": 50,
+#       "changedFiles": 8,
+#       "labels": ["enhancement", "feature"],
+#       "analysisStatus": "pending",
+#       "lastSyncedAt": "2026-05-22T10:30:00",
+#       "createdAt": "2026-05-20T08:00:00",
+#       "updatedAt": "2026-05-21T15:30:00"
+#     }
+#   ]
+# }
+
+# Successful List (Test #8):
+# [
+#   {
+#     "id": "...",
+#     "prNumber": 1,
+#     "title": "Add new feature",
+#     "state": "open",
+#     ...
+#   }
+# ]
+
+# Successful Detail (Test #14):
+# {
+#   "id": "...",
+#   "repositoryId": "...",
+#   "repositoryName": "my-repo",
+#   "repositoryFullName": "owner/my-repo",
+#   "repositoryOwner": "owner",
+#   "prNumber": 1,
+#   "title": "Add new feature",
+#   "description": "This PR adds...",
+#   "headSha": "abc123...",
+#   "baseSha": "def456...",
+#   "mergeableState": "clean",
+#   ...
+# }
+
+# Count Response (Test #15):
+# {
+#   "count": 10,
+#   "state": "all"
+# }
+
+# Error - No Token (Test #19):
+# {
+#   "error": "GitHub token is required. Please provide a token or set it in your profile."
+# }
+
+# Error - PR Not Found (Test #20):
+# {
+#   "error": "Pull request #99999 not found"
+# }
+
+###
+
+###############################################
+### INTEGRATION WITH REPOSITORIES
+###############################################
+
+# To get repository IDs for testing:
+
+### Get All Repositories
+GET {{baseUrl}}/repositories
+Authorization: Bearer {{token}}
+
+###
+
+# Copy a repository ID from the response and use it as @repoId
+
+###

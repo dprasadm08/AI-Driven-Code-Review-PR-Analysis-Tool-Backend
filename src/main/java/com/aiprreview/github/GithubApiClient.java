@@ -1,5 +1,6 @@
 package com.aiprreview.github;
 
+import com.aiprreview.dto.github.GithubPullRequestDto;
 import com.aiprreview.dto.github.GithubRepositoryDto;
 import com.aiprreview.exception.GithubApiException;
 import lombok.RequiredArgsConstructor;
@@ -136,6 +137,81 @@ public class GithubApiClient {
         } catch (Exception ex) {
             log.error("Failed to fetch repository {}/{}", owner, repo, ex);
             throw new GithubApiException("Failed to fetch repository: " + ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * Fetch pull requests for a repository
+     */
+    public List<GithubPullRequestDto> getRepositoryPullRequests(String owner, String repo, String state, String token) {
+        String authToken = token != null && !token.isEmpty() ? token : defaultGithubToken;
+
+        if (authToken == null || authToken.isEmpty()) {
+            throw new GithubApiException("GitHub token is required to fetch pull requests");
+        }
+
+        try {
+            return githubWebClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/repos/{owner}/{repo}/pulls")
+                            .queryParam("state", state != null ? state : "all")
+                            .queryParam("per_page", perPage)
+                            .queryParam("sort", "updated")
+                            .queryParam("direction", "desc")
+                            .build(owner, repo))
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + authToken)
+                    .header(HttpHeaders.ACCEPT, "application/vnd.github.v3+json")
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is4xxClientError, response -> {
+                        log.error("GitHub API error fetching PRs for {}/{}: {}", owner, repo, response.statusCode());
+                        return Mono.error(new GithubApiException(
+                                "Failed to fetch pull requests for " + owner + "/" + repo));
+                    })
+                    .onStatus(HttpStatusCode::is5xxServerError, response -> {
+                        log.error("GitHub API 5xx error: {}", response.statusCode());
+                        return Mono.error(new GithubApiException(
+                                "GitHub API server error: " + response.statusCode()));
+                    })
+                    .bodyToMono(new ParameterizedTypeReference<List<GithubPullRequestDto>>() {})
+                    .block();
+        } catch (Exception ex) {
+            log.error("Failed to fetch pull requests for {}/{}", owner, repo, ex);
+            throw new GithubApiException("Failed to fetch pull requests: " + ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * Fetch a single pull request
+     */
+    public GithubPullRequestDto getPullRequest(String owner, String repo, Integer prNumber, String token) {
+        String authToken = token != null && !token.isEmpty() ? token : defaultGithubToken;
+
+        if (authToken == null || authToken.isEmpty()) {
+            throw new GithubApiException("GitHub token is required to fetch pull request");
+        }
+
+        try {
+            return githubWebClient.get()
+                    .uri("/repos/{owner}/{repo}/pulls/{prNumber}", owner, repo, prNumber)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + authToken)
+                    .header(HttpHeaders.ACCEPT, "application/vnd.github.v3+json")
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is4xxClientError, response -> {
+                        log.error("GitHub API error fetching PR #{} for {}/{}: {}", 
+                                prNumber, owner, repo, response.statusCode());
+                        return Mono.error(new GithubApiException(
+                                "Pull request #" + prNumber + " not found"));
+                    })
+                    .onStatus(HttpStatusCode::is5xxServerError, response -> {
+                        log.error("GitHub API 5xx error: {}", response.statusCode());
+                        return Mono.error(new GithubApiException(
+                                "GitHub API server error: " + response.statusCode()));
+                    })
+                    .bodyToMono(GithubPullRequestDto.class)
+                    .block();
+        } catch (Exception ex) {
+            log.error("Failed to fetch pull request #{} for {}/{}", prNumber, owner, repo, ex);
+            throw new GithubApiException("Failed to fetch pull request: " + ex.getMessage(), ex);
         }
     }
 }
