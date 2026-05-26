@@ -2,6 +2,7 @@ package com.aiprreview.controller;
 
 import com.aiprreview.dto.pullrequest.PullRequestDetailResponse;
 import com.aiprreview.dto.pullrequest.PullRequestResponse;
+import com.aiprreview.dto.pullrequest.PullRequestWithFilesResponse;
 import com.aiprreview.service.PullRequestService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +38,24 @@ public class PullRequestController {
         log.info("Fetching pull request with id: {}", id);
         PullRequestDetailResponse pullRequest = pullRequestService.getPullRequestById(id);
         return ResponseEntity.ok(pullRequest);
+    }
+
+    @GetMapping("/{id}/details")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> getPullRequestDetails(
+            @PathVariable String id,
+            @RequestParam(required = false) String token,
+            @RequestParam(required = false, defaultValue = "false") boolean includeDiff) {
+        try {
+            log.info("Fetching pull request details with files for id: {}, includeDiff: {}", id, includeDiff);
+            PullRequestWithFilesResponse pullRequest = pullRequestService.getPullRequestWithFiles(id, token, includeDiff);
+            return ResponseEntity.ok(pullRequest);
+        } catch (Exception ex) {
+            log.error("Failed to fetch pull request details: {}", ex.getMessage());
+            Map<String, String> error = new HashMap<>();
+            error.put("error", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
     }
 
     @GetMapping("/repository/{repoId}")

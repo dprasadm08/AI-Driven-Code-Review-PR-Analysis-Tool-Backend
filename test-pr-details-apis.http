@@ -1,0 +1,284 @@
+### Pull Request Details API Tests
+
+@baseUrl = http://localhost:8080/api
+@token = YOUR_JWT_TOKEN_HERE
+@githubToken = YOUR_GITHUB_TOKEN_HERE
+@prId = YOUR_PR_ID_HERE
+@repoId = YOUR_REPOSITORY_ID_HERE
+
+###############################################
+### SETUP: Login first to get token
+###############################################
+
+### 1. Login to get JWT token
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "usernameOrEmail": "testuser",
+  "password": "password123"
+}
+
+###
+
+###############################################
+### GET PULL REQUEST DETAILS WITH FILES
+###############################################
+
+### 2. Get PR Details with Files and Commits (without diff)
+# This fetches the PR along with all changed files and commits
+GET {{baseUrl}}/pull-requests/{{prId}}/details
+Authorization: Bearer {{token}}
+
+###
+
+### 3. Get PR Details with Files and Full Diff
+# includeDiff=true will fetch the complete unified diff (can be large)
+GET {{baseUrl}}/pull-requests/{{prId}}/details?includeDiff=true
+Authorization: Bearer {{token}}
+
+###
+
+### 4. Get PR Details with Explicit GitHub Token
+GET {{baseUrl}}/pull-requests/{{prId}}/details?token={{githubToken}}
+Authorization: Bearer {{token}}
+
+###
+
+### 5. Get PR Details with Diff and GitHub Token
+GET {{baseUrl}}/pull-requests/{{prId}}/details?includeDiff=true&token={{githubToken}}
+Authorization: Bearer {{token}}
+
+###
+
+###############################################
+### WORKFLOW: First Get PR List, Then Details
+###############################################
+
+### 6. Get All PRs for a Repository (to get PR IDs)
+GET {{baseUrl}}/pull-requests/repository/{{repoId}}
+Authorization: Bearer {{token}}
+
+###
+
+### 7. Get Specific PR by ID (Basic Info)
+GET {{baseUrl}}/pull-requests/{{prId}}
+Authorization: Bearer {{token}}
+
+###
+
+### 8. Get Full PR Details with Files (Extended Info)
+GET {{baseUrl}}/pull-requests/{{prId}}/details
+Authorization: Bearer {{token}}
+
+###
+
+###############################################
+### ERROR CASES
+###############################################
+
+### 9. Get Details Without Authentication (Should return 401)
+GET {{baseUrl}}/pull-requests/{{prId}}/details
+
+###
+
+### 10. Get Details for Non-Existent PR (Should return 404)
+GET {{baseUrl}}/pull-requests/invalid-pr-id/details
+Authorization: Bearer {{token}}
+
+###
+
+### 11. Get Details Without GitHub Token (Should fail if not in profile)
+GET {{baseUrl}}/pull-requests/{{prId}}/details
+Authorization: Bearer {{token}}
+
+###
+
+### 12. Get Details for PR You Don't Own (Should return 403/400)
+GET {{baseUrl}}/pull-requests/someone-else-pr-id/details
+Authorization: Bearer {{token}}
+
+###
+
+###############################################
+### TESTING WORKFLOW
+###############################################
+
+# STEP 1: Setup
+#   - Get GitHub Personal Access Token with 'repo' scope
+#   - Login and get JWT token (Test #1)
+#   - Copy the accessToken
+
+# STEP 2: Get Repository and PR IDs
+#   - List repositories: GET /repositories
+#   - Copy a repository ID and set as @repoId
+#   - Sync PRs: POST /pull-requests/repository/{repoId}/sync
+#   - List PRs: GET /pull-requests/repository/{repoId}
+#   - Copy a PR ID and set as @prId
+
+# STEP 3: Update Variables
+#   - Set @token to your JWT token
+#   - Set @githubToken to your GitHub token
+#   - Set @prId to a valid PR ID
+#   - Set @repoId to a valid repository ID
+
+# STEP 4: Fetch PR Details (Tests #2-5)
+#   - Start without diff to see files/commits only
+#   - Then try with includeDiff=true for full diff
+
+# STEP 5: Test Error Cases (Tests #9-12)
+
+###
+
+###############################################
+### EXPECTED RESPONSES
+###############################################
+
+# Successful Details Response (Test #2):
+# {
+#   "id": "...",
+#   "repositoryId": "...",
+#   "repositoryName": "my-repo",
+#   "repositoryFullName": "owner/my-repo",
+#   "prNumber": 1,
+#   "title": "Add new feature",
+#   "description": "This PR adds...",
+#   "state": "open",
+#   "author": "johndoe",
+#   "authorAvatarUrl": "https://avatars.githubusercontent.com/u/...",
+#   "htmlUrl": "https://github.com/owner/repo/pull/1",
+#   "headBranch": "feature-branch",
+#   "headSha": "abc123...",
+#   "baseBranch": "main",
+#   "baseSha": "def456...",
+#   "isDraft": false,
+#   "isMerged": false,
+#   "isMergeable": true,
+#   "commentsCount": 5,
+#   "reviewCommentsCount": 3,
+#   "commitsCount": 10,
+#   "additions": 150,
+#   "deletions": 50,
+#   "changedFiles": 8,
+#   "labels": ["enhancement", "feature"],
+#   "createdAt": "2026-05-20T08:00:00",
+#   "updatedAt": "2026-05-21T15:30:00",
+#   "files": [
+#     {
+#       "filename": "src/main/java/com/example/MyClass.java",
+#       "status": "modified",
+#       "additions": 25,
+#       "deletions": 10,
+#       "changes": 35,
+#       "patch": "@@ -10,7 +10,8 @@ public class MyClass {\n...",
+#       "blobUrl": "https://github.com/owner/repo/blob/...",
+#       "rawUrl": "https://github.com/owner/repo/raw/..."
+#     },
+#     {
+#       "filename": "src/main/java/com/example/NewClass.java",
+#       "status": "added",
+#       "additions": 50,
+#       "deletions": 0,
+#       "changes": 50,
+#       "patch": "@@ -0,0 +1,50 @@\n+public class NewClass {\n...",
+#       "blobUrl": "https://github.com/owner/repo/blob/...",
+#       "rawUrl": "https://github.com/owner/repo/raw/..."
+#     }
+#   ],
+#   "commits": [
+#     {
+#       "sha": "abc123def456...",
+#       "message": "Add new feature implementation",
+#       "author": "johndoe",
+#       "authorEmail": "john@example.com",
+#       "authorAvatarUrl": "https://avatars.githubusercontent.com/u/...",
+#       "authoredAt": "2026-05-20T10:00:00",
+#       "committer": "johndoe",
+#       "committerEmail": "john@example.com",
+#       "committedAt": "2026-05-20T10:00:00",
+#       "htmlUrl": "https://github.com/owner/repo/commit/abc123..."
+#     }
+#   ],
+#   "diff": null
+# }
+
+# With Diff (Test #3):
+# Same as above, but "diff" field contains the full unified diff:
+# {
+#   ...
+#   "diff": "diff --git a/src/main/java/com/example/MyClass.java b/src/main/java/com/example/MyClass.java\nindex abc123..def456 100644\n--- a/src/main/java/com/example/MyClass.java\n+++ b/src/main/java/com/example/MyClass.java\n@@ -10,7 +10,8 @@ public class MyClass {\n-    old code\n+    new code\n..."
+# }
+
+# Error - No Token (Test #11):
+# {
+#   "error": "GitHub token is required to fetch pull request details"
+# }
+
+# Error - Not Found (Test #10):
+# {
+#   "error": "Pull request not found with id: invalid-pr-id"
+# }
+
+###
+
+###############################################
+### FILE STATUS VALUES
+###############################################
+
+# Files can have the following status values:
+# - "added": New file created in this PR
+# - "modified": Existing file changed
+# - "removed": File deleted in this PR
+# - "renamed": File renamed/moved
+
+###
+
+###############################################
+### UNDERSTANDING THE PATCH FORMAT
+###############################################
+
+# The "patch" field contains unified diff format:
+# - Lines starting with "-" are deletions (removed lines)
+# - Lines starting with "+" are additions (new lines)
+# - Lines starting with " " (space) are context lines
+# - @@ markers show line numbers: @@ -old_start,old_count +new_start,new_count @@
+
+# Example patch:
+# "@@ -10,7 +10,8 @@ public class MyClass {
+#  
+#      public void existingMethod() {
+# -        // Old implementation
+# +        // New improved implementation
+# +        // Additional line
+#          System.out.println(\"Hello\");
+#      }
+#  }"
+
+###
+
+###############################################
+### USE CASES
+###############################################
+
+# 1. Code Review Dashboard:
+#    - Fetch PR list: GET /pull-requests/repository/{repoId}
+#    - Show PR summary
+#    - On PR click, fetch details: GET /pull-requests/{id}/details
+#    - Display files changed and commit history
+
+# 2. AI Code Analysis:
+#    - Fetch PR with diff: GET /pull-requests/{id}/details?includeDiff=true
+#    - Parse the diff for AI analysis
+#    - Analyze code changes for issues, best practices, etc.
+
+# 3. Change Tracking:
+#    - Fetch files to see what changed
+#    - Track additions/deletions statistics
+#    - Monitor file rename/move operations
+
+# 4. Commit History:
+#    - View all commits in the PR
+#    - See commit messages and authors
+#    - Link to GitHub for full commit details
+
+###

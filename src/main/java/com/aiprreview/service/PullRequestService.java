@@ -1,8 +1,13 @@
 package com.aiprreview.service;
 
+import com.aiprreview.dto.github.GithubCommitDto;
 import com.aiprreview.dto.github.GithubPullRequestDto;
+import com.aiprreview.dto.github.GithubPullRequestFileDto;
+import com.aiprreview.dto.pullrequest.PullRequestCommitResponse;
 import com.aiprreview.dto.pullrequest.PullRequestDetailResponse;
+import com.aiprreview.dto.pullrequest.PullRequestFileResponse;
 import com.aiprreview.dto.pullrequest.PullRequestResponse;
+import com.aiprreview.dto.pullrequest.PullRequestWithFilesResponse;
 import com.aiprreview.entity.PullRequest;
 import com.aiprreview.entity.RepositoryEntity;
 import com.aiprreview.entity.User;
@@ -191,6 +196,82 @@ public class PullRequestService {
                 .orElseThrow(() -> new ResourceNotFoundException("Repository not found"));
         
         return mapToDetailResponse(pullRequest, repository);
+    }
+
+    /**
+     * Get pull request details with files and commits from GitHub
+     */
+    public PullRequestWithFilesResponse getPullRequestWithFiles(String id, String githubToken, boolean includeDiff) {
+        User currentUser = authService.getCurrentUser();
+        
+        PullRequest pullRequest = pullRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Pull request not found with id: " + id));
+        
+        if (!pullRequest.getUserId().equals(currentUser.getId())) {
+            throw new IllegalArgumentException("You don't have access to this pull request");
+        }
+        
+        RepositoryEntity repository = repositoryRepository.findById(pullRequest.getRepositoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("Repository not found"));
+        
+        String token = githubToken != null ? githubToken : currentUser.getGithubToken();
+        
+        if (token == null || token.isEmpty()) {
+            throw new GithubApiException("GitHub token is required to fetch pull request details");
+        }
+        
+        log.info("Fetching PR #{} details with files from GitHub for repository: {}", 
+                pullRequest.getPrNumber(), repository.getFullName());
+        
+        try {
+            // Fetch files
+            List<GithubPullRequestFileDto> githubFiles = githubApiClient.getPullRequestFiles(
+                    repository.getOwner(),
+                    repository.getName(),
+                    pullRequest.getPrNumber(),
+                    token
+            );
+            
+            // Fetch commits
+            List<GithubCommitDto> githubCommits = githubApiClient.getPullRequestCommits(
+                    repository.getOwner(),
+                    repository.getName(),
+                    pullRequest.getPrNumber(),
+                    token
+            );
+            
+            // Optionally fetch diff
+            String diff = null;
+            if (includeDiff) {
+                diff = githubApiClient.getPullRequestDiff(
+                        repository.getOwner(),
+                        repository.getName(),
+                        pullRequest.getPrNumber(),
+                        token
+                );
+            }
+            
+            // Map to response DTOs
+            List<PullRequestFileResponse> files = githubFiles.stream()
+                    .map(this::mapToFileResponse)
+                    .collect(Collectors.toList());
+            
+            List<PullRequestCommitResponse> commits = githubCommits.stream()
+                    .map(this::mapToCommitResponse)
+                    .collect(Collectors.toList());
+            
+            log.info("Successfully fetched {} files and {} commits for PR #{}", 
+                    files.size(), commits.size(), pullRequest.getPrNumber());
+            
+            return mapToWithFilesResponse(pullRequest, repository, files, commits, diff);
+            
+        } catch (GithubApiException ex) {
+            log.error("GitHub API error: {}", ex.getMessage());
+            throw ex;
+        } catch (Exception ex) {
+            log.error("Failed to fetch PR details with files", ex);
+            throw new GithubApiException("Failed to fetch pull request details: " + ex.getMessage(), ex);
+        }
     }
 
     /**
@@ -417,6 +498,81 @@ public class PullRequestService {
                 .updatedAt(pr.getUpdatedAt())
                 .mergedAt(pr.getMergedAt())
                 .closedAt(pr.getClosedAt())
+                .build();
+    }
+
+    private PullRequestFileResponse mapToFileResponse(GithubPullRequestFileDto file) {
+        return PullRequestFileResponse.builder()
+                .filename(file.getFilename())
+                .status(file.getStatus())
+                .additions(file.getAdditions())
+                .deletions(file.getDeletions())
+                .changes(file.getChanges())
+                .patch(file.getPatch())
+                .previousFilename(file.getPreviousFilename())
+                .blobUrl(file.getBlobUrl())
+                .rawUrl(file.getRawUrl())
+                .build();
+    }
+
+    private PullRequestCommitResponse mapToCommitResponse(GithubCommitDto commit) {
+        return PullRequestCommitResponse.builder()
+                .sha(commit.getSha())
+                .message(commit.getCommit() != null ? commit.getCommit().getMessage() : null)
+                .author(commit.getAuthor() != null ? commit.getAuthor().getLogin() : null)
+                .authorEmail(commit.getCommit() != null && commit.getCommit().getAuthor() != null 
+                        ? commit.getCommit().getAuthor().getEmail() : null)
+                .authorAvatarUrl(commit.getAuthor() != null ? commit.getAuthor().getAvatarUrl() : null)
+                .authoredAt(commit.getCommit() != null && commit.getCommit().getAuthor() != null 
+                        ? commit.getCommit().getAuthor().getDate() : null)
+                .committer(commit.getCommitter() != null ? commit.getCommitter().getLogin() : null)
+                .committerEmail(commit.getCommit() != null && commit.getCommit().getCommitter() != null 
+                        ? commit.getCommit().getCommitter().getEmail() : null)
+                .committedAt(commit.getCommit() != null && commit.getCommit().getCommitter() != null 
+                        ? commit.getCommit().getCommitter().getDate() : null)
+                .htmlUrl(commit.getHtmlUrl())
+                .build();
+    }
+
+    private PullRequestWithFilesResponse mapToWithFilesResponse(
+            PullRequest pr, 
+            RepositoryEntity repository, 
+            List<PullRequestFileResponse> files,
+            List<PullRequestCommitResponse> commits,
+            String diff) {
+        return PullRequestWithFilesResponse.builder()
+                .id(pr.getId())
+                .repositoryId(pr.getRepositoryId())
+                .repositoryName(repository.getName())
+                .repositoryFullName(repository.getFullName())
+                .prNumber(pr.getPrNumber())
+                .title(pr.getTitle())
+                .description(pr.getDescription())
+                .state(pr.getState())
+                .author(pr.getAuthor())
+                .authorAvatarUrl(pr.getAuthorAvatarUrl())
+                .htmlUrl(pr.getHtmlUrl())
+                .headBranch(pr.getHeadBranch())
+                .headSha(pr.getHeadSha())
+                .baseBranch(pr.getBaseBranch())
+                .baseSha(pr.getBaseSha())
+                .isDraft(pr.getIsDraft())
+                .isMerged(pr.getIsMerged())
+                .isMergeable(pr.getIsMergeable())
+                .commentsCount(pr.getCommentsCount())
+                .reviewCommentsCount(pr.getReviewCommentsCount())
+                .commitsCount(pr.getCommitsCount())
+                .additions(pr.getAdditions())
+                .deletions(pr.getDeletions())
+                .changedFiles(pr.getChangedFiles())
+                .labels(pr.getLabels())
+                .createdAt(pr.getCreatedAt())
+                .updatedAt(pr.getUpdatedAt())
+                .mergedAt(pr.getMergedAt())
+                .closedAt(pr.getClosedAt())
+                .files(files)
+                .commits(commits)
+                .diff(diff)
                 .build();
     }
 }
