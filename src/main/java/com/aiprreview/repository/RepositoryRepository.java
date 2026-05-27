@@ -16,6 +16,8 @@ public interface RepositoryRepository extends MongoRepository<RepositoryEntity, 
 
     Optional<RepositoryEntity> findByUserIdAndFullName(String userId, String fullName);
 
+    List<RepositoryEntity> findByFullName(String fullName);
+
     Optional<RepositoryEntity> findByIdAndUserId(String id, String userId);
 
     Boolean existsByUserIdAndFullName(String userId, String fullName);

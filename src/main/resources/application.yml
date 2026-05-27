@@ -28,6 +28,8 @@ app:
       token: ${GITHUB_TOKEN:}  # Set via environment variable or here
       timeout: 30000  # 30 seconds
       per-page: 30  # Results per page
+    webhook:
+      secret: ${GITHUB_WEBHOOK_SECRET:}  # GitHub webhook secret for signature validation
   
   ai:
     openai:

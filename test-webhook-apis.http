@@ -1,0 +1,383 @@
+### GitHub Webhook Testing
+
+@baseUrl = http://localhost:8080/api
+@webhookSecret = your_webhook_secret_here
+
+###############################################
+### WEBHOOK ENDPOINT TESTING
+###############################################
+
+### 1. Test Webhook Endpoint (GET)
+# Verify the webhook endpoint is accessible
+GET {{baseUrl}}/webhooks/github
+
+###
+
+### 2. Health Check
+GET {{baseUrl}}/webhooks/health
+
+###
+
+###############################################
+### SIMULATE GITHUB WEBHOOK EVENTS
+###############################################
+
+### 3. Pull Request Opened Event (Without Signature)
+# This simulates a PR opened event
+# Note: Signature validation will be skipped if webhook secret is not configured
+POST {{baseUrl}}/webhooks/github
+Content-Type: application/json
+X-GitHub-Event: pull_request
+X-GitHub-Delivery: 12345678-1234-1234-1234-123456789abc
+
+{
+  "action": "opened",
+  "number": 1,
+  "pull_request": {
+    "id": 1234567890,
+    "number": 1,
+    "state": "open",
+    "title": "Add new feature via webhook",
+    "body": "This PR was created to test webhook integration",
+    "user": {
+      "id": 123456,
+      "login": "testuser",
+      "avatar_url": "https://avatars.githubusercontent.com/u/123456"
+    },
+    "html_url": "https://github.com/owner/repo/pull/1",
+    "head": {
+      "ref": "feature-branch",
+      "sha": "abc123def456789"
+    },
+    "base": {
+      "ref": "main",
+      "sha": "def456abc123789"
+    },
+    "draft": false,
+    "merged": false,
+    "created_at": "2026-05-28T10:00:00Z",
+    "updated_at": "2026-05-28T10:00:00Z"
+  },
+  "repository": {
+    "id": 987654321,
+    "name": "test-repo",
+    "full_name": "testuser/test-repo",
+    "owner": {
+      "id": 123456,
+      "login": "testuser"
+    },
+    "html_url": "https://github.com/testuser/test-repo"
+  },
+  "sender": {
+    "id": 123456,
+    "login": "testuser",
+    "avatar_url": "https://avatars.githubusercontent.com/u/123456"
+  }
+}
+
+###
+
+### 4. Pull Request Synchronize Event (New Commits)
+POST {{baseUrl}}/webhooks/github
+Content-Type: application/json
+X-GitHub-Event: pull_request
+X-GitHub-Delivery: 12345678-1234-1234-1234-123456789def
+
+{
+  "action": "synchronize",
+  "number": 1,
+  "pull_request": {
+    "id": 1234567890,
+    "number": 1,
+    "state": "open",
+    "title": "Add new feature via webhook",
+    "body": "This PR was updated with new commits",
+    "user": {
+      "id": 123456,
+      "login": "testuser",
+      "avatar_url": "https://avatars.githubusercontent.com/u/123456"
+    },
+    "html_url": "https://github.com/owner/repo/pull/1",
+    "head": {
+      "ref": "feature-branch",
+      "sha": "new123sha456789"
+    },
+    "base": {
+      "ref": "main",
+      "sha": "def456abc123789"
+    },
+    "draft": false,
+    "merged": false,
+    "created_at": "2026-05-28T10:00:00Z",
+    "updated_at": "2026-05-28T11:00:00Z"
+  },
+  "repository": {
+    "id": 987654321,
+    "name": "test-repo",
+    "full_name": "testuser/test-repo",
+    "owner": {
+      "id": 123456,
+      "login": "testuser"
+    },
+    "html_url": "https://github.com/testuser/test-repo"
+  },
+  "sender": {
+    "id": 123456,
+    "login": "testuser",
+    "avatar_url": "https://avatars.githubusercontent.com/u/123456"
+  }
+}
+
+###
+
+### 5. Pull Request Closed Event (Merged)
+POST {{baseUrl}}/webhooks/github
+Content-Type: application/json
+X-GitHub-Event: pull_request
+X-GitHub-Delivery: 12345678-1234-1234-1234-123456789ghi
+
+{
+  "action": "closed",
+  "number": 1,
+  "pull_request": {
+    "id": 1234567890,
+    "number": 1,
+    "state": "closed",
+    "title": "Add new feature via webhook",
+    "body": "This PR was merged",
+    "user": {
+      "id": 123456,
+      "login": "testuser",
+      "avatar_url": "https://avatars.githubusercontent.com/u/123456"
+    },
+    "html_url": "https://github.com/owner/repo/pull/1",
+    "head": {
+      "ref": "feature-branch",
+      "sha": "new123sha456789"
+    },
+    "base": {
+      "ref": "main",
+      "sha": "def456abc123789"
+    },
+    "draft": false,
+    "merged": true,
+    "created_at": "2026-05-28T10:00:00Z",
+    "updated_at": "2026-05-28T12:00:00Z"
+  },
+  "repository": {
+    "id": 987654321,
+    "name": "test-repo",
+    "full_name": "testuser/test-repo",
+    "owner": {
+      "id": 123456,
+      "login": "testuser"
+    },
+    "html_url": "https://github.com/testuser/test-repo"
+  },
+  "sender": {
+    "id": 123456,
+    "login": "testuser",
+    "avatar_url": "https://avatars.githubusercontent.com/u/123456"
+  }
+}
+
+###
+
+### 6. Pull Request Reopened Event
+POST {{baseUrl}}/webhooks/github
+Content-Type: application/json
+X-GitHub-Event: pull_request
+X-GitHub-Delivery: 12345678-1234-1234-1234-123456789jkl
+
+{
+  "action": "reopened",
+  "number": 1,
+  "pull_request": {
+    "id": 1234567890,
+    "number": 1,
+    "state": "open",
+    "title": "Add new feature via webhook",
+    "body": "This PR was reopened",
+    "user": {
+      "id": 123456,
+      "login": "testuser",
+      "avatar_url": "https://avatars.githubusercontent.com/u/123456"
+    },
+    "html_url": "https://github.com/owner/repo/pull/1",
+    "head": {
+      "ref": "feature-branch",
+      "sha": "new123sha456789"
+    },
+    "base": {
+      "ref": "main",
+      "sha": "def456abc123789"
+    },
+    "draft": false,
+    "merged": false,
+    "created_at": "2026-05-28T10:00:00Z",
+    "updated_at": "2026-05-28T13:00:00Z"
+  },
+  "repository": {
+    "id": 987654321,
+    "name": "test-repo",
+    "full_name": "testuser/test-repo",
+    "owner": {
+      "id": 123456,
+      "login": "testuser"
+    },
+    "html_url": "https://github.com/testuser/test-repo"
+  },
+  "sender": {
+    "id": 123456,
+    "login": "testuser",
+    "avatar_url": "https://avatars.githubusercontent.com/u/123456"
+  }
+}
+
+###
+
+### 7. Non-PR Event (Should be ignored)
+POST {{baseUrl}}/webhooks/github
+Content-Type: application/json
+X-GitHub-Event: push
+X-GitHub-Delivery: 12345678-1234-1234-1234-123456789mno
+
+{
+  "ref": "refs/heads/main",
+  "repository": {
+    "name": "test-repo",
+    "full_name": "testuser/test-repo"
+  }
+}
+
+###
+
+###############################################
+### EXPECTED RESPONSES
+###############################################
+
+# Successful PR Opened (Test #3):
+# {
+#   "message": "Webhook received successfully",
+#   "event": "pull_request",
+#   "action": "opened",
+#   "repository": "testuser/test-repo",
+#   "prNumber": "1"
+# }
+
+# Successful Synchronize (Test #4):
+# {
+#   "message": "Webhook received successfully",
+#   "event": "pull_request",
+#   "action": "synchronize",
+#   "repository": "testuser/test-repo",
+#   "prNumber": "1"
+# }
+
+# Non-PR Event (Test #7):
+# {
+#   "message": "Event type not supported: push"
+# }
+
+###
+
+###############################################
+### SETUP GITHUB WEBHOOK
+###############################################
+
+# To set up a real GitHub webhook:
+# 
+# 1. Go to your GitHub repository
+# 2. Settings → Webhooks → Add webhook
+# 3. Payload URL: http://your-server:8080/api/webhooks/github
+#    (Use ngrok for local testing: https://ngrok.com)
+# 4. Content type: application/json
+# 5. Secret: Set the same value as GITHUB_WEBHOOK_SECRET env var
+# 6. Events: Select "Let me select individual events"
+#    - Check "Pull requests"
+# 7. Active: Check this box
+# 8. Add webhook
+#
+# For local testing with ngrok:
+# 1. Install ngrok: https://ngrok.com/download
+# 2. Run: ngrok http 8080
+# 3. Copy the HTTPS URL (e.g., https://abc123.ngrok.io)
+# 4. Use as Payload URL: https://abc123.ngrok.io/api/webhooks/github
+
+###
+
+###############################################
+### WEBHOOK SECRET CONFIGURATION
+###############################################
+
+# Set environment variable:
+# Windows PowerShell:
+# $env:GITHUB_WEBHOOK_SECRET = "your_secret_here"
+#
+# Linux/Mac:
+# export GITHUB_WEBHOOK_SECRET=your_secret_here
+#
+# The secret is used to validate that webhooks come from GitHub
+# Generate a strong random secret:
+# - Use: openssl rand -hex 32
+# - Or any password generator
+
+###
+
+###############################################
+### WEBHOOK EVENTS HANDLED
+###############################################
+
+# Action: "opened" - New PR created
+#   - Creates new PullRequest entity in database
+#   - Sets analysisStatus to "pending"
+#
+# Action: "synchronize" - New commits pushed to PR
+#   - Updates headSha
+#   - Resets analysisStatus to "pending"
+#
+# Action: "closed" - PR closed or merged
+#   - Updates state to "closed" or "merged"
+#   - Sets closedAt and mergedAt timestamps
+#
+# Action: "reopened" - Closed PR reopened
+#   - Updates state back to "open"
+
+###
+
+###############################################
+### TESTING WORKFLOW
+###############################################
+
+# STEP 1: Verify endpoint is accessible (Test #1)
+# STEP 2: Create a repository in the database first
+#   - Use: POST /repositories (manual add)
+#   - Or: POST /repositories/sync/github (from GitHub)
+#   - Ensure full_name matches "testuser/test-repo" in webhook payload
+# STEP 3: Send PR opened event (Test #3)
+# STEP 4: Verify PR was created: GET /pull-requests
+# STEP 5: Send synchronize event (Test #4)
+# STEP 6: Verify PR was updated with new SHA
+# STEP 7: Send closed event (Test #5)
+# STEP 8: Verify PR state changed to "merged"
+
+###
+
+###############################################
+### DATABASE VERIFICATION
+###############################################
+
+# After sending webhooks, check MongoDB:
+# 
+# Webhook Events Collection:
+# db.webhook_events.find().sort({createdAt: -1})
+#
+# Pull Requests Collection:
+# db.pull_requests.find({prNumber: 1})
+#
+# Check status field in webhook_events:
+# - "processing": Currently being processed
+# - "processed": Successfully processed
+# - "failed": Processing failed (check errorMessage)
+
+###
