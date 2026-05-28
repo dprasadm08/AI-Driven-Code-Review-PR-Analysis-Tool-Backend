@@ -9,46 +9,47 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "analysis_results")
-public class AnalysisResult {
+@Document(collection = "analysis_requests")
+public class AnalysisRequest {
 
     @Id
     private String id;
 
     @Indexed
-    private String analysisRequestId;
-
-    @Indexed
-    private String pullRequestId;
+    private String userId;
 
     @Indexed
     private String repositoryId;
 
     @Indexed
-    private String userId;
+    private String pullRequestId;
 
-    private String status; // completed, failed
+    private String headSha;
 
-    private String summary;
+    private String baseSha;
 
-    private Map<String, Object> findings;
+    private List<String> files;
 
-    private Double score;
+    private String status; // queued, in_progress, completed, failed
+
+    private Integer priority;
 
     private String model;
 
-    private String modelVersion;
+    private Map<String, Object> metadata;
 
     private LocalDateTime createdAt;
 
+    private LocalDateTime startedAt;
+
     private LocalDateTime completedAt;
 
-    private Map<String, Object> rawOutput;
+    private String resultId;
 }
-// AnalysisResult.java
