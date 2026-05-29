@@ -15,4 +15,3 @@ public interface AnalysisResultRepository extends MongoRepository<AnalysisResult
 
     List<AnalysisResult> findByUserId(String userId);
 }
-// AnalysisResultRepository.java

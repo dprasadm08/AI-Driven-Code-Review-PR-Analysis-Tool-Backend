@@ -51,4 +51,3 @@ public class AnalysisResult {
 
     private Map<String, Object> rawOutput;
 }
-// AnalysisResult.java
