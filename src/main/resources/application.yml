@@ -32,6 +32,10 @@ app:
       secret: ${GITHUB_WEBHOOK_SECRET:}  # GitHub webhook secret for signature validation
   
   ai:
+    prompt:
+      max-tokens: 7000
+      reserved-output-tokens: 1000
+
     openai:
       api-key: ${OPENAI_API_KEY:}
       model: gpt-4
