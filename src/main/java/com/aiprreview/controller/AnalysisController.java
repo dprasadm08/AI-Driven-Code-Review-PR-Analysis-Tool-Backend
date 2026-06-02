@@ -1,5 +1,6 @@
 package com.aiprreview.controller;
 
+import com.aiprreview.ai.OpenAiService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,8 @@ import java.util.Map;
 @RequestMapping("/analysis")
 @RequiredArgsConstructor
 public class AnalysisController {
+
+    private final OpenAiService openAiService;
 
     @PostMapping("/trigger")
     @PreAuthorize("hasRole('USER')")
@@ -46,5 +49,18 @@ public class AnalysisController {
         response.put("analysisId", analysisId);
         response.put("status", "completed");
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/test/openai")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> testOpenAiConnectivity() {
+        log.info("Testing OpenAI API connectivity");
+        OpenAiService.ConnectivityResult result = openAiService.testConnectivity();
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", result.success());
+        response.put("model", result.model());
+        response.put("message", result.message());
+        response.put("rawReply", result.rawReply());
+        return result.success() ? ResponseEntity.ok(response) : ResponseEntity.status(503).body(response);
     }
 }

@@ -1,6 +1,8 @@
 package com.aiprreview.service;
 
+import com.aiprreview.ai.OpenAiService;
 import com.aiprreview.ai.PromptBuilderService;
+import com.aiprreview.dto.openai.OpenAiResponse;
 import com.aiprreview.entity.AnalysisRequest;
 import com.aiprreview.entity.AnalysisResult;
 import com.aiprreview.entity.PullRequest;
@@ -10,6 +12,7 @@ import com.aiprreview.repository.AnalysisRequestRepository;
 import com.aiprreview.repository.AnalysisResultRepository;
 import com.aiprreview.repository.PullRequestRepository;
 import com.aiprreview.repository.RepositoryRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -18,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+@Slf4j
 @Service
 public class AnalysisService {
 
@@ -26,18 +30,21 @@ public class AnalysisService {
 	private final PullRequestRepository pullRequestRepository;
 	private final RepositoryRepository repositoryRepository;
 	private final PromptBuilderService promptBuilderService;
+	private final OpenAiService openAiService;
 
 	public AnalysisService(
 			AnalysisRequestRepository requestRepository,
 			AnalysisResultRepository resultRepository,
 			PullRequestRepository pullRequestRepository,
 			RepositoryRepository repositoryRepository,
-			PromptBuilderService promptBuilderService) {
+			PromptBuilderService promptBuilderService,
+			OpenAiService openAiService) {
 		this.requestRepository = requestRepository;
 		this.resultRepository = resultRepository;
 		this.pullRequestRepository = pullRequestRepository;
 		this.repositoryRepository = repositoryRepository;
 		this.promptBuilderService = promptBuilderService;
+		this.openAiService = openAiService;
 	}
 
 	public AnalysisRequest submitAnalysisRequest(AnalysisRequest req) {
@@ -129,14 +136,36 @@ public class AnalysisService {
 			req.setMetadata(metadata);
 			requestRepository.save(req);
 
-			// TODO: integrate with AI provider to perform real analysis
+			String status = "completed";
+			String summary = null;
+			Map<String, Object> rawOutput = new HashMap<>();
+
+			try {
+				OpenAiResponse aiResponse = openAiService.chat(promptBuildResult.prompt());
+				String content = aiResponse.firstContent();
+				rawOutput.put("rawContent", content);
+				if (aiResponse.getUsage() != null) {
+					rawOutput.put("promptTokens", aiResponse.getUsage().getPromptTokens());
+					rawOutput.put("completionTokens", aiResponse.getUsage().getCompletionTokens());
+					rawOutput.put("totalTokens", aiResponse.getUsage().getTotalTokens());
+				}
+				summary = content != null && content.length() > 200 ? content.substring(0, 200) + "..." : content;
+				log.info("OpenAI analysis completed for requestId={}", req.getId());
+			} catch (Exception ex) {
+				log.error("OpenAI analysis failed for requestId={}: {}", req.getId(), ex.getMessage());
+				status = "failed";
+				rawOutput.put("error", ex.getMessage());
+			}
+
 			AnalysisResult res = AnalysisResult.builder()
 					.analysisRequestId(req.getId())
 					.pullRequestId(req.getPullRequestId())
 					.repositoryId(req.getRepositoryId())
 					.userId(req.getUserId())
-					.status("completed")
-					.summary("Analysis not implemented yet")
+					.status(status)
+					.summary(summary)
+					.rawOutput(rawOutput)
+					.model(req.getModel())
 					.createdAt(LocalDateTime.now())
 					.completedAt(LocalDateTime.now())
 					.build();

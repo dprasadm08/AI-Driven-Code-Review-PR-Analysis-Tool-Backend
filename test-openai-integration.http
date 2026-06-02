@@ -1,0 +1,41 @@
+### ====================================================
+### OpenAI Integration Tests
+### ====================================================
+### Prerequisites:
+###   1. App running: ./mvnw spring-boot:run
+###   2. @baseUrl = http://localhost:8080/api
+###   3. Obtain a JWT token from /auth/login and set @token
+### ====================================================
+
+@baseUrl = http://localhost:8080/api
+@token = YOUR_JWT_TOKEN_HERE
+
+### 1. Test OpenAI API Connectivity
+### Verifies the API key is set and the model is reachable.
+GET {{baseUrl}}/analysis/test/openai
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+###
+
+### 2. Trigger an analysis for a PR
+### Replace prId with an actual pull request mongo _id
+POST {{baseUrl}}/analysis/trigger
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "prId": "REPLACE_WITH_PULL_REQUEST_ID"
+}
+
+###
+
+### 3. Get analysis results for a PR
+GET {{baseUrl}}/analysis/results/REPLACE_WITH_PULL_REQUEST_ID
+Authorization: Bearer {{token}}
+
+###
+
+### 4. Get analysis status
+GET {{baseUrl}}/analysis/status/REPLACE_WITH_ANALYSIS_ID
+Authorization: Bearer {{token}}
