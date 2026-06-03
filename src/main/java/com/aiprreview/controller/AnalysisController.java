@@ -1,5 +1,7 @@
 package com.aiprreview.controller;
 
+import com.aiprreview.ai.AiProvider;
+import com.aiprreview.ai.AiProviderRouter;
 import com.aiprreview.ai.OpenAiService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +19,7 @@ import java.util.Map;
 public class AnalysisController {
 
     private final OpenAiService openAiService;
+    private final AiProviderRouter aiProviderRouter;
 
     @PostMapping("/trigger")
     @PreAuthorize("hasRole('USER')")
@@ -55,12 +58,46 @@ public class AnalysisController {
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<?> testOpenAiConnectivity() {
         log.info("Testing OpenAI API connectivity");
-        OpenAiService.ConnectivityResult result = openAiService.testConnectivity();
+        AiProvider.ConnectivityResult result = openAiService.testConnectivity();
         Map<String, Object> response = new HashMap<>();
+        response.put("success", result.success());
+        response.put("provider", result.provider());
+        response.put("model", result.model());
+        response.put("message", result.message());
+        response.put("rawReply", result.rawReply());
+        return result.success() ? ResponseEntity.ok(response) : ResponseEntity.status(503).body(response);
+    }
+
+    @GetMapping("/test/claude")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> testClaudeConnectivity() {
+        log.info("Testing Claude API connectivity");
+        AiProvider provider = aiProviderRouter.resolveProvider("claude");
+        AiProvider.ConnectivityResult result = provider.testConnectivity();
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", result.success());
+        response.put("provider", result.provider());
+        response.put("model", result.model());
+        response.put("message", result.message());
+        response.put("rawReply", result.rawReply());
+        return result.success() ? ResponseEntity.ok(response) : ResponseEntity.status(503).body(response);
+    }
+
+    @GetMapping("/test/provider")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> testProviderSwitch(@RequestParam(required = false) String provider) {
+        AiProvider selected = aiProviderRouter.resolveProvider(provider);
+        AiProvider.ConnectivityResult result = selected.testConnectivity();
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("requestedProvider", provider);
+        response.put("selectedProvider", selected.getProviderName());
+        response.put("availableProviders", aiProviderRouter.getAvailableProviders());
         response.put("success", result.success());
         response.put("model", result.model());
         response.put("message", result.message());
         response.put("rawReply", result.rawReply());
+
         return result.success() ? ResponseEntity.ok(response) : ResponseEntity.status(503).body(response);
     }
 }

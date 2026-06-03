@@ -32,6 +32,8 @@ app:
       secret: ${GITHUB_WEBHOOK_SECRET:}  # GitHub webhook secret for signature validation
   
   ai:
+    provider: ${AI_PROVIDER:openai}
+
     prompt:
       max-tokens: 7000
       reserved-output-tokens: 1000
@@ -48,6 +50,10 @@ app:
       api-key: ${CLAUDE_API_KEY:}
       model: claude-3-5-sonnet-20241022
       base-url: https://api.anthropic.com/v1
+      max-tokens: 1000
+      temperature: 0.2
+      timeout-seconds: 60
+      anthropic-version: 2023-06-01
 
 logging:
   level:

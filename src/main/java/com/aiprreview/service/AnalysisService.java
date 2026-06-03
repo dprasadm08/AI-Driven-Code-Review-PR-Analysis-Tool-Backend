@@ -3,6 +3,9 @@ package com.aiprreview.service;
 import com.aiprreview.ai.OpenAiService;
 import com.aiprreview.ai.PromptBuilderService;
 import com.aiprreview.dto.openai.OpenAiResponse;
+import com.aiprreview.ai.AiProvider;
+import com.aiprreview.ai.AiProviderRouter;
+import com.aiprreview.ai.AiResponseParser;
 import com.aiprreview.entity.AnalysisRequest;
 import com.aiprreview.entity.AnalysisResult;
 import com.aiprreview.entity.PullRequest;
@@ -30,7 +33,7 @@ public class AnalysisService {
 	private final PullRequestRepository pullRequestRepository;
 	private final RepositoryRepository repositoryRepository;
 	private final PromptBuilderService promptBuilderService;
-	private final OpenAiService openAiService;
+	private final AiProviderRouter aiProviderRouter;
 
 	public AnalysisService(
 			AnalysisRequestRepository requestRepository,
@@ -38,13 +41,13 @@ public class AnalysisService {
 			PullRequestRepository pullRequestRepository,
 			RepositoryRepository repositoryRepository,
 			PromptBuilderService promptBuilderService,
-			OpenAiService openAiService) {
+			AiProviderRouter aiProviderRouter) {
 		this.requestRepository = requestRepository;
 		this.resultRepository = resultRepository;
 		this.pullRequestRepository = pullRequestRepository;
 		this.repositoryRepository = repositoryRepository;
 		this.promptBuilderService = promptBuilderService;
-		this.openAiService = openAiService;
+		this.aiProviderRouter = aiProviderRouter;
 	}
 
 	public AnalysisRequest submitAnalysisRequest(AnalysisRequest req) {
@@ -139,21 +142,23 @@ public class AnalysisService {
 			String status = "completed";
 			String summary = null;
 			Map<String, Object> rawOutput = new HashMap<>();
+			String preferredProvider = metadata.get("provider") != null
+					? String.valueOf(metadata.get("provider"))
+					: null;
+			AiProvider provider = aiProviderRouter.resolveProvider(preferredProvider);
 
 			try {
-				OpenAiResponse aiResponse = openAiService.chat(promptBuildResult.prompt());
-				String content = aiResponse.firstContent();
+				AiProvider.AiProviderResponse aiResponse = provider.analyze(promptBuildResult.prompt());
+				String content = aiResponse.content();
 				rawOutput.put("rawContent", content);
-				if (aiResponse.getUsage() != null) {
-					rawOutput.put("promptTokens", aiResponse.getUsage().getPromptTokens());
-					rawOutput.put("completionTokens", aiResponse.getUsage().getCompletionTokens());
-					rawOutput.put("totalTokens", aiResponse.getUsage().getTotalTokens());
-				}
-				summary = content != null && content.length() > 200 ? content.substring(0, 200) + "..." : content;
-				log.info("OpenAI analysis completed for requestId={}", req.getId());
+				rawOutput.put("usage", aiResponse.usage());
+				rawOutput.put("provider", aiResponse.provider());
+				summary = AiResponseParser.extractSummary(content, 200);
+				log.info("AI analysis completed for requestId={} provider={}", req.getId(), provider.getProviderName());
 			} catch (Exception ex) {
-				log.error("OpenAI analysis failed for requestId={}: {}", req.getId(), ex.getMessage());
+				log.error("AI analysis failed for requestId={} provider={}: {}", req.getId(), provider.getProviderName(), ex.getMessage());
 				status = "failed";
+				rawOutput.put("provider", provider.getProviderName());
 				rawOutput.put("error", ex.getMessage());
 			}
 
@@ -165,7 +170,7 @@ public class AnalysisService {
 					.status(status)
 					.summary(summary)
 					.rawOutput(rawOutput)
-					.model(req.getModel())
+					.model(provider.getProviderName())
 					.createdAt(LocalDateTime.now())
 					.completedAt(LocalDateTime.now())
 					.build();

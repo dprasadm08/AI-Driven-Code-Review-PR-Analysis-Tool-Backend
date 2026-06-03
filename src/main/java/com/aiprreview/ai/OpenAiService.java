@@ -19,7 +19,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class OpenAiService {
+public class OpenAiService implements AiProvider {
 
     private static final String SYSTEM_ROLE = "system";
     private static final String USER_ROLE = "user";
@@ -28,6 +28,11 @@ public class OpenAiService {
             "Always respond with valid JSON matching the schema described in the user message.";
 
     private final OpenAiConfig openAiConfig;
+
+    @Override
+    public String getProviderName() {
+        return "openai";
+    }
 
     // ----------------------------------------------------------------
     // Payload builder
@@ -89,13 +94,26 @@ public class OpenAiService {
         }
     }
 
+    @Override
+    public AiProviderResponse analyze(String prompt) {
+        OpenAiResponse response = chat(prompt);
+        String content = response.firstContent();
+        java.util.Map<String, Object> usage = new java.util.HashMap<>();
+        if (response.getUsage() != null) {
+            usage.put("promptTokens", response.getUsage().getPromptTokens());
+            usage.put("completionTokens", response.getUsage().getCompletionTokens());
+            usage.put("totalTokens", response.getUsage().getTotalTokens());
+        }
+        return new AiProviderResponse(getProviderName(), content, usage);
+    }
+
     // ----------------------------------------------------------------
     // Connectivity test — sends a minimal message to verify key + network
     // ----------------------------------------------------------------
 
     public ConnectivityResult testConnectivity() {
         if (openAiConfig.getApiKey() == null || openAiConfig.getApiKey().isBlank()) {
-            return ConnectivityResult.failure("OPENAI_API_KEY is not configured.");
+            return ConnectivityResult.failure(getProviderName(), openAiConfig.getModel(), "OPENAI_API_KEY is not configured.");
         }
 
         try {
@@ -118,14 +136,15 @@ public class OpenAiService {
                     .block();
 
             if (response != null && response.getChoices() != null && !response.getChoices().isEmpty()) {
-                return ConnectivityResult.success(openAiConfig.getModel(), response.firstContent());
+                return ConnectivityResult.success(getProviderName(), openAiConfig.getModel(), response.firstContent());
             }
-            return ConnectivityResult.failure("No choices returned from OpenAI");
+            return ConnectivityResult.failure(getProviderName(), openAiConfig.getModel(), "No choices returned from OpenAI");
 
         } catch (WebClientResponseException ex) {
-            return ConnectivityResult.failure("HTTP " + ex.getStatusCode() + ": " + ex.getResponseBodyAsString());
+            return ConnectivityResult.failure(getProviderName(), openAiConfig.getModel(),
+                    "HTTP " + ex.getStatusCode() + ": " + ex.getResponseBodyAsString());
         } catch (Exception ex) {
-            return ConnectivityResult.failure(ex.getMessage());
+            return ConnectivityResult.failure(getProviderName(), openAiConfig.getModel(), ex.getMessage());
         }
     }
 
@@ -156,13 +175,5 @@ public class OpenAiService {
         public OpenAiException(String message, Throwable cause) { super(message, cause); }
     }
 
-    public record ConnectivityResult(boolean success, String model, String message, String rawReply) {
-        public static ConnectivityResult success(String model, String rawReply) {
-            return new ConnectivityResult(true, model, "Connected successfully", rawReply);
-        }
-        public static ConnectivityResult failure(String message) {
-            return new ConnectivityResult(false, null, message, null);
-        }
-    }
 }
 

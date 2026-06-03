@@ -1,0 +1,34 @@
+### ====================================================
+### AI Provider Switching Tests (OpenAI / Claude)
+### ====================================================
+
+@baseUrl = http://localhost:8080/api
+@token = YOUR_JWT_TOKEN_HERE
+
+### 1) OpenAI connectivity
+GET {{baseUrl}}/analysis/test/openai
+Authorization: Bearer {{token}}
+
+###
+
+### 2) Claude connectivity
+GET {{baseUrl}}/analysis/test/claude
+Authorization: Bearer {{token}}
+
+###
+
+### 3) Switch to OpenAI explicitly
+GET {{baseUrl}}/analysis/test/provider?provider=openai
+Authorization: Bearer {{token}}
+
+###
+
+### 4) Switch to Claude explicitly
+GET {{baseUrl}}/analysis/test/provider?provider=claude
+Authorization: Bearer {{token}}
+
+###
+
+### 5) Use configured default provider (app.ai.provider)
+GET {{baseUrl}}/analysis/test/provider
+Authorization: Bearer {{token}}
