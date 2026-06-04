@@ -3,6 +3,10 @@ package com.aiprreview.controller;
 import com.aiprreview.ai.AiProvider;
 import com.aiprreview.ai.AiProviderRouter;
 import com.aiprreview.ai.OpenAiService;
+import com.aiprreview.analysis.BugAnalysisResult;
+import com.aiprreview.analysis.BugAnalysisService;
+import com.aiprreview.dto.pullrequest.PullRequestWithFilesResponse;
+import com.aiprreview.service.PullRequestService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +24,8 @@ public class AnalysisController {
 
     private final OpenAiService openAiService;
     private final AiProviderRouter aiProviderRouter;
+    private final BugAnalysisService bugAnalysisService;
+    private final PullRequestService pullRequestService;
 
     @PostMapping("/trigger")
     @PreAuthorize("hasRole('USER')")
@@ -99,5 +105,18 @@ public class AnalysisController {
         response.put("rawReply", result.rawReply());
 
         return result.success() ? ResponseEntity.ok(response) : ResponseEntity.status(503).body(response);
+    }
+
+    @PostMapping("/bugs/{pullRequestId}")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> detectBugs(
+            @PathVariable String pullRequestId,
+            @RequestParam(required = false) String provider,
+            @RequestParam(required = false) String token,
+            @RequestParam(defaultValue = "false") boolean includeDiff) {
+        log.info("Running bug detection on PR id={} provider={}", pullRequestId, provider);
+        PullRequestWithFilesResponse prDetail = pullRequestService.getPullRequestWithFiles(pullRequestId, token, includeDiff);
+        BugAnalysisResult result = bugAnalysisService.analyze(prDetail, provider);
+        return ResponseEntity.ok(result);
     }
 }
