@@ -5,6 +5,8 @@ import com.aiprreview.ai.AiProviderRouter;
 import com.aiprreview.ai.OpenAiService;
 import com.aiprreview.analysis.BugAnalysisResult;
 import com.aiprreview.analysis.BugAnalysisService;
+import com.aiprreview.analysis.SecurityAnalysisResult;
+import com.aiprreview.analysis.SecurityAnalysisService;
 import com.aiprreview.dto.pullrequest.PullRequestWithFilesResponse;
 import com.aiprreview.service.PullRequestService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ public class AnalysisController {
     private final OpenAiService openAiService;
     private final AiProviderRouter aiProviderRouter;
     private final BugAnalysisService bugAnalysisService;
+    private final SecurityAnalysisService securityAnalysisService;
     private final PullRequestService pullRequestService;
 
     @PostMapping("/trigger")
@@ -117,6 +120,19 @@ public class AnalysisController {
         log.info("Running bug detection on PR id={} provider={}", pullRequestId, provider);
         PullRequestWithFilesResponse prDetail = pullRequestService.getPullRequestWithFiles(pullRequestId, token, includeDiff);
         BugAnalysisResult result = bugAnalysisService.analyze(prDetail, provider);
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/security/{pullRequestId}")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> detectSecurityVulnerabilities(
+            @PathVariable String pullRequestId,
+            @RequestParam(required = false) String provider,
+            @RequestParam(required = false) String token,
+            @RequestParam(defaultValue = "false") boolean includeDiff) {
+        log.info("Running security analysis on PR id={} provider={}", pullRequestId, provider);
+        PullRequestWithFilesResponse prDetail = pullRequestService.getPullRequestWithFiles(pullRequestId, token, includeDiff);
+        SecurityAnalysisResult result = securityAnalysisService.analyze(prDetail, provider);
         return ResponseEntity.ok(result);
     }
 }
