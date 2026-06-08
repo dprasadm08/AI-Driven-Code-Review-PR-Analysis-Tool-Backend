@@ -7,6 +7,8 @@ import com.aiprreview.analysis.BugAnalysisResult;
 import com.aiprreview.analysis.BugAnalysisService;
 import com.aiprreview.analysis.SecurityAnalysisResult;
 import com.aiprreview.analysis.SecurityAnalysisService;
+import com.aiprreview.analysis.PerformanceAnalysisResult;
+import com.aiprreview.analysis.PerformanceAnalysisService;
 import com.aiprreview.dto.pullrequest.PullRequestWithFilesResponse;
 import com.aiprreview.service.PullRequestService;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class AnalysisController {
     private final AiProviderRouter aiProviderRouter;
     private final BugAnalysisService bugAnalysisService;
     private final SecurityAnalysisService securityAnalysisService;
+    private final PerformanceAnalysisService performanceAnalysisService;
     private final PullRequestService pullRequestService;
 
     @PostMapping("/trigger")
@@ -133,6 +136,19 @@ public class AnalysisController {
         log.info("Running security analysis on PR id={} provider={}", pullRequestId, provider);
         PullRequestWithFilesResponse prDetail = pullRequestService.getPullRequestWithFiles(pullRequestId, token, includeDiff);
         SecurityAnalysisResult result = securityAnalysisService.analyze(prDetail, provider);
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/performance/{pullRequestId}")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> detectPerformanceIssues(
+            @PathVariable String pullRequestId,
+            @RequestParam(required = false) String provider,
+            @RequestParam(required = false) String token,
+            @RequestParam(defaultValue = "false") boolean includeDiff) {
+        log.info("Running performance analysis on PR id={} provider={}", pullRequestId, provider);
+        PullRequestWithFilesResponse prDetail = pullRequestService.getPullRequestWithFiles(pullRequestId, token, includeDiff);
+        PerformanceAnalysisResult result = performanceAnalysisService.analyze(prDetail, provider);
         return ResponseEntity.ok(result);
     }
 }
