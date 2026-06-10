@@ -11,6 +11,8 @@ import com.aiprreview.analysis.PerformanceAnalysisResult;
 import com.aiprreview.analysis.PerformanceAnalysisService;
 import com.aiprreview.analysis.CodeQualityAnalysisResult;
 import com.aiprreview.analysis.CodeQualityAnalysisService;
+import com.aiprreview.analysis.TestCaseAnalysisResult;
+import com.aiprreview.analysis.TestCaseAnalysisService;
 import com.aiprreview.dto.pullrequest.PullRequestWithFilesResponse;
 import com.aiprreview.service.PullRequestService;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ public class AnalysisController {
     private final SecurityAnalysisService securityAnalysisService;
     private final PerformanceAnalysisService performanceAnalysisService;
     private final CodeQualityAnalysisService codeQualityAnalysisService;
+    private final TestCaseAnalysisService testCaseAnalysisService;
     private final PullRequestService pullRequestService;
 
     @PostMapping("/trigger")
@@ -165,6 +168,19 @@ public class AnalysisController {
         log.info("Running code-quality analysis on PR id={} provider={}", pullRequestId, provider);
         PullRequestWithFilesResponse prDetail = pullRequestService.getPullRequestWithFiles(pullRequestId, token, includeDiff);
         CodeQualityAnalysisResult result = codeQualityAnalysisService.analyze(prDetail, provider);
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/test-cases/{pullRequestId}")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> analyzeTestCoverage(
+            @PathVariable String pullRequestId,
+            @RequestParam(required = false) String provider,
+            @RequestParam(required = false) String token,
+            @RequestParam(defaultValue = "false") boolean includeDiff) {
+        log.info("Running test-case analysis on PR id={} provider={}", pullRequestId, provider);
+        PullRequestWithFilesResponse prDetail = pullRequestService.getPullRequestWithFiles(pullRequestId, token, includeDiff);
+        TestCaseAnalysisResult result = testCaseAnalysisService.analyze(prDetail, provider);
         return ResponseEntity.ok(result);
     }
 }
