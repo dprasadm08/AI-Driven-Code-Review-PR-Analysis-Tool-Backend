@@ -13,7 +13,10 @@ import com.aiprreview.analysis.CodeQualityAnalysisResult;
 import com.aiprreview.analysis.CodeQualityAnalysisService;
 import com.aiprreview.analysis.TestCaseAnalysisResult;
 import com.aiprreview.analysis.TestCaseAnalysisService;
+import com.aiprreview.analysis.UnifiedAnalysisService;
+import com.aiprreview.dto.analysis.UnifiedAnalysisResponse;
 import com.aiprreview.dto.pullrequest.PullRequestWithFilesResponse;
+import com.aiprreview.entity.AnalysisResult;
 import com.aiprreview.service.PullRequestService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +25,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -37,6 +41,7 @@ public class AnalysisController {
     private final PerformanceAnalysisService performanceAnalysisService;
     private final CodeQualityAnalysisService codeQualityAnalysisService;
     private final TestCaseAnalysisService testCaseAnalysisService;
+    private final UnifiedAnalysisService unifiedAnalysisService;
     private final PullRequestService pullRequestService;
 
     @PostMapping("/trigger")
@@ -54,11 +59,8 @@ public class AnalysisController {
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<?> getAnalysisResults(@PathVariable String prId) {
         log.info("Fetching analysis results for PR: {}", prId);
-        Map<String, Object> response = new HashMap<>();
-        response.put("message", "Protected endpoint - analysis results");
-        response.put("prId", prId);
-        response.put("results", Map.of());
-        return ResponseEntity.ok(response);
+        List<AnalysisResult> results = unifiedAnalysisService.getResultsForPullRequest(prId);
+        return ResponseEntity.ok(results);
     }
 
     @GetMapping("/status/{analysisId}")
@@ -181,6 +183,23 @@ public class AnalysisController {
         log.info("Running test-case analysis on PR id={} provider={}", pullRequestId, provider);
         PullRequestWithFilesResponse prDetail = pullRequestService.getPullRequestWithFiles(pullRequestId, token, includeDiff);
         TestCaseAnalysisResult result = testCaseAnalysisService.analyze(prDetail, provider);
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/full/{pullRequestId}")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> runUnifiedAnalysis(
+            @PathVariable String pullRequestId,
+            @RequestParam(required = false) String provider,
+            @RequestParam(required = false) String token,
+            @RequestParam(defaultValue = "false") boolean includeDiff) {
+        log.info("Running unified analysis on PR id={} provider={}", pullRequestId, provider);
+        UnifiedAnalysisResponse result = unifiedAnalysisService.analyzeAndStore(
+                pullRequestId,
+                provider,
+                token,
+                includeDiff
+        );
         return ResponseEntity.ok(result);
     }
 }
