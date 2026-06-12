@@ -1,0 +1,171 @@
+### Analysis API Tests
+
+@baseUrl = http://localhost:8080/api
+@token = YOUR_JWT_TOKEN_HERE
+@prId = YOUR_PR_ID_HERE
+@analysisId = YOUR_ANALYSIS_RESULT_ID_HERE
+
+###############################################
+### Manual PR Analysis Endpoint (POST /analysis/manual)
+###############################################
+
+### 1. Run ALL modules (default)
+POST {{baseUrl}}/analysis/manual
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "pullRequestId": "{{prId}}",
+  "provider": "openai",
+  "githubToken": "ghp_yourtoken",
+  "includeDiff": true
+}
+
+###
+
+### 2. Run specific modules only
+POST {{baseUrl}}/analysis/manual
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "pullRequestId": "{{prId}}",
+  "provider": "claude",
+  "includeDiff": false,
+  "modules": ["bug", "security"]
+}
+
+###
+
+### 3. Validation - missing pullRequestId (Should return 400)
+POST {{baseUrl}}/analysis/manual
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "provider": "openai"
+}
+
+###
+
+### 4. Validation - invalid provider (Should return 400)
+POST {{baseUrl}}/analysis/manual
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "pullRequestId": "{{prId}}",
+  "provider": "invalidprovider"
+}
+
+###
+
+### 5. Validation - invalid module name (Should return 400)
+POST {{baseUrl}}/analysis/manual
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "pullRequestId": "{{prId}}",
+  "modules": ["bug", "nonexistent"]
+}
+
+###
+
+### 6. No token (Should return 401)
+POST {{baseUrl}}/analysis/manual
+Content-Type: application/json
+
+{
+  "pullRequestId": "{{prId}}"
+}
+
+###
+
+###############################################
+### Results & Status
+###############################################
+
+### 7. Get all analysis results for a PR
+GET {{baseUrl}}/analysis/results/{{prId}}
+Authorization: Bearer {{token}}
+
+###
+
+### 8. Get analysis status by result ID
+GET {{baseUrl}}/analysis/status/{{analysisId}}
+Authorization: Bearer {{token}}
+
+###
+
+### 9. Status - not found (Should return 404)
+GET {{baseUrl}}/analysis/status/000000000000000000000000
+Authorization: Bearer {{token}}
+
+###
+
+###############################################
+### Unified Full Analysis
+###############################################
+
+### 10. Run unified analysis via path param
+POST {{baseUrl}}/analysis/full/{{prId}}?provider=openai&includeDiff=true
+Authorization: Bearer {{token}}
+
+###
+
+###############################################
+### Individual Module Endpoints
+###############################################
+
+### 11. Bug detection
+POST {{baseUrl}}/analysis/bugs/{{prId}}?provider=openai&includeDiff=true
+Authorization: Bearer {{token}}
+
+###
+
+### 12. Security analysis
+POST {{baseUrl}}/analysis/security/{{prId}}?provider=openai
+Authorization: Bearer {{token}}
+
+###
+
+### 13. Performance analysis
+POST {{baseUrl}}/analysis/performance/{{prId}}?provider=openai
+Authorization: Bearer {{token}}
+
+###
+
+### 14. Code quality analysis
+POST {{baseUrl}}/analysis/code-quality/{{prId}}?provider=openai
+Authorization: Bearer {{token}}
+
+###
+
+### 15. Test case coverage
+POST {{baseUrl}}/analysis/test-cases/{{prId}}?provider=openai
+Authorization: Bearer {{token}}
+
+###
+
+###############################################
+### Provider Connectivity Tests
+###############################################
+
+### 16. Test OpenAI connectivity
+GET {{baseUrl}}/analysis/test/openai
+Authorization: Bearer {{token}}
+
+###
+
+### 17. Test Claude connectivity
+GET {{baseUrl}}/analysis/test/claude
+Authorization: Bearer {{token}}
+
+###
+
+### 18. Test provider switching
+GET {{baseUrl}}/analysis/test/provider?provider=openai
+Authorization: Bearer {{token}}
+
+###
