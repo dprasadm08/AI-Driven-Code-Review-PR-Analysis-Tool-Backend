@@ -30,6 +30,11 @@ app:
       per-page: 30  # Results per page
     webhook:
       secret: ${GITHUB_WEBHOOK_SECRET:}  # GitHub webhook secret for signature validation
+      analysis:
+        enabled: ${WEBHOOK_ANALYSIS_ENABLED:true}  # Auto-trigger analysis on webhook events
+        provider: ${WEBHOOK_ANALYSIS_PROVIDER:openai}  # Which AI provider to use
+        include-diff: ${WEBHOOK_ANALYSIS_INCLUDE_DIFF:false}  # Include full diff in auto-triggered analysis
+        trigger-actions: opened,synchronize  # Comma-separated actions that trigger analysis
   
   ai:
     provider: ${AI_PROVIDER:openai}

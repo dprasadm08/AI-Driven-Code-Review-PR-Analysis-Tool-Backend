@@ -1,0 +1,229 @@
+### Webhook-Triggered Analysis Tests
+
+@baseUrl = http://localhost:8080/api
+@secret = ${GITHUB_WEBHOOK_SECRET:}
+
+###############################################
+### Webhook Health Check
+###############################################
+
+### 1. Test webhook endpoint is active
+GET {{baseUrl}}/webhooks/github
+Content-Type: application/json
+
+###
+
+### 2. Webhook health check
+GET {{baseUrl}}/webhooks/health
+Content-Type: application/json
+
+###
+
+###############################################
+### Simulating GitHub Webhook Events
+###############################################
+
+### 3. Simulate PR opened event (triggers auto-analysis)
+POST {{baseUrl}}/webhooks/github
+Content-Type: application/json
+X-GitHub-Event: pull_request
+X-GitHub-Delivery: 12345-67890-abcdef
+X-Hub-Signature-256: sha256=your_signature_here
+
+{
+  "action": "opened",
+  "pull_request": {
+    "id": 1296269,
+    "number": 1,
+    "state": "open",
+    "title": "Amazing new feature",
+    "description": "This PR includes amazing improvements",
+    "draft": false,
+    "merged": false,
+    "user": {
+      "login": "octocat",
+      "avatar_url": "https://github.com/images/error/octocat_happy.gif"
+    },
+    "head": {
+      "ref": "feature/awesome",
+      "sha": "6dcb09b5b57875f3c8ea6c3d2b3a6c3c0e4e4e4e"
+    },
+    "base": {
+      "ref": "main",
+      "sha": "2b9b3a3a8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c"
+    }
+  },
+  "repository": {
+    "id": 1296269,
+    "name": "Hello-World",
+    "full_name": "octocat/Hello-World"
+  },
+  "sender": {
+    "login": "octocat"
+  }
+}
+
+###
+
+### 4. Simulate PR synchronize event (new commits pushed - triggers auto-analysis)
+POST {{baseUrl}}/webhooks/github
+Content-Type: application/json
+X-GitHub-Event: pull_request
+X-GitHub-Delivery: 12345-67891-abcdef
+X-Hub-Signature-256: sha256=your_signature_here
+
+{
+  "action": "synchronize",
+  "pull_request": {
+    "id": 1296269,
+    "number": 1,
+    "state": "open",
+    "title": "Amazing new feature",
+    "description": "This PR includes amazing improvements",
+    "draft": false,
+    "merged": false,
+    "user": {
+      "login": "octocat",
+      "avatar_url": "https://github.com/images/error/octocat_happy.gif"
+    },
+    "head": {
+      "ref": "feature/awesome",
+      "sha": "7dcb09b5b57875f3c8ea6c3d2b3a6c3c0e4e4e4f"
+    },
+    "base": {
+      "ref": "main",
+      "sha": "2b9b3a3a8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c"
+    }
+  },
+  "repository": {
+    "id": 1296269,
+    "name": "Hello-World",
+    "full_name": "octocat/Hello-World"
+  },
+  "sender": {
+    "login": "octocat"
+  }
+}
+
+###
+
+### 5. Simulate PR reopened event (triggers auto-analysis)
+POST {{baseUrl}}/webhooks/github
+Content-Type: application/json
+X-GitHub-Event: pull_request
+X-GitHub-Delivery: 12345-67892-abcdef
+X-Hub-Signature-256: sha256=your_signature_here
+
+{
+  "action": "reopened",
+  "pull_request": {
+    "id": 1296269,
+    "number": 1,
+    "state": "open",
+    "title": "Amazing new feature",
+    "description": "This PR includes amazing improvements",
+    "draft": false,
+    "merged": false,
+    "user": {
+      "login": "octocat",
+      "avatar_url": "https://github.com/images/error/octocat_happy.gif"
+    },
+    "head": {
+      "ref": "feature/awesome",
+      "sha": "6dcb09b5b57875f3c8ea6c3d2b3a6c3c0e4e4e4e"
+    },
+    "base": {
+      "ref": "main",
+      "sha": "2b9b3a3a8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c"
+    }
+  },
+  "repository": {
+    "id": 1296269,
+    "name": "Hello-World",
+    "full_name": "octocat/Hello-World"
+  },
+  "sender": {
+    "login": "octocat"
+  }
+}
+
+###
+
+### 6. Simulate PR closed event (does NOT trigger auto-analysis by default)
+POST {{baseUrl}}/webhooks/github
+Content-Type: application/json
+X-GitHub-Event: pull_request
+X-GitHub-Delivery: 12345-67893-abcdef
+X-Hub-Signature-256: sha256=your_signature_here
+
+{
+  "action": "closed",
+  "pull_request": {
+    "id": 1296269,
+    "number": 1,
+    "state": "closed",
+    "title": "Amazing new feature",
+    "description": "This PR includes amazing improvements",
+    "draft": false,
+    "merged": true,
+    "user": {
+      "login": "octocat",
+      "avatar_url": "https://github.com/images/error/octocat_happy.gif"
+    },
+    "head": {
+      "ref": "feature/awesome",
+      "sha": "6dcb09b5b57875f3c8ea6c3d2b3a6c3c0e4e4e4e"
+    },
+    "base": {
+      "ref": "main",
+      "sha": "2b9b3a3a8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c"
+    }
+  },
+  "repository": {
+    "id": 1296269,
+    "name": "Hello-World",
+    "full_name": "octocat/Hello-World"
+  },
+  "sender": {
+    "login": "octocat"
+  }
+}
+
+###
+
+### 7. Unsupported event type (will be ignored)
+POST {{baseUrl}}/webhooks/github
+Content-Type: application/json
+X-GitHub-Event: issues
+X-GitHub-Delivery: 12345-67894-abcdef
+X-Hub-Signature-256: sha256=your_signature_here
+
+{
+  "action": "opened",
+  "issue": {
+    "id": 1,
+    "number": 1,
+    "title": "Found a bug"
+  }
+}
+
+###
+
+###############################################
+### Configuration Notes
+###############################################
+
+# Webhook automatic analysis is controlled by these environment variables:
+# - WEBHOOK_ANALYSIS_ENABLED=true|false (default: true)
+# - WEBHOOK_ANALYSIS_PROVIDER=openai|claude (default: openai)
+# - WEBHOOK_ANALYSIS_INCLUDE_DIFF=true|false (default: false)
+# Trigger actions are configured in application.yml:
+# - app.github.webhook.analysis.trigger-actions=opened,synchronize (default)
+#
+# When a webhook event is received:
+# 1. Webhook controller validates signature (if secret configured)
+# 2. Webhook service processes PR event and saves it to database
+# 3. Async analysis trigger method checks if action should trigger analysis
+# 4. If enabled and action matches, UnifiedAnalysisService is called asynchronously
+# 5. Webhook response returns immediately (does not wait for analysis to complete)
+# 6. Analysis runs in background and results are stored in database

@@ -1,5 +1,7 @@
 package com.aiprreview.service;
 
+import com.aiprreview.analysis.UnifiedAnalysisService;
+import com.aiprreview.config.WebhookAnalysisConfig;
 import com.aiprreview.dto.webhook.GithubWebhookPayload;
 import com.aiprreview.entity.PullRequest;
 import com.aiprreview.entity.RepositoryEntity;
@@ -11,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.Mac;
@@ -29,8 +32,8 @@ public class WebhookService {
 
     private final WebhookEventRepository webhookEventRepository;
     private final RepositoryRepository repositoryRepository;
-    private final PullRequestRepository pullRequestRepository;
-    private final ObjectMapper objectMapper;
+    private final PullRequestRepository pullRequestRepository;    private final UnifiedAnalysisService unifiedAnalysisService;
+    private final WebhookAnalysisConfig webhookAnalysisConfig;    private final ObjectMapper objectMapper;
 
     @Value(\"${app.github.webhook.secret:}\")
     private String webhookSecret;
@@ -199,7 +202,12 @@ public class WebhookService {
 
         log.info(\"Successfully created pull request from webhook: #{} (ID: {})\",
                 pullRequest.getPrNumber(), pullRequest.getId());
-
+        // Trigger automatic analysis asynchronously
+        triggerAutomaticAnalysis(
+                pullRequest.getId(),
+                payload.getAction(),
+                payload.getRepository().getFullName()
+        );
         webhookEvent.setStatus(\"processed\");
     }
 
@@ -243,6 +251,12 @@ public class WebhookService {
         pullRequestRepository.save(pullRequest);
 
         log.info(\"Updated pull request from synchronize event: #{}\", pullRequest.getPrNumber());
+        // Trigger automatic analysis asynchronously
+        triggerAutomaticAnalysis(
+                pullRequest.getId(),
+                payload.getAction(),
+                payload.getRepository().getFullName()
+        );
         webhookEvent.setStatus(\"processed\");
     }
 
@@ -323,6 +337,45 @@ public class WebhookService {
         pullRequestRepository.save(pullRequest);
 
         log.info(\"Reopened pull request: #{}\", pullRequest.getPrNumber());
+        // Trigger automatic analysis asynchronously
+        triggerAutomaticAnalysis(
+                pullRequest.getId(),
+                payload.getAction(),
+                payload.getRepository().getFullName()
+        );
         webhookEvent.setStatus(\"processed\");
     }
+
+    /**
+     * Trigger automatic AI analysis for a pull request (async, non-blocking)
+     * Called after a PR event is saved and processed
+     */
+    @Async
+    public void triggerAutomaticAnalysis(String pullRequestId, String action, String repositoryFullName) {
+        if (!webhookAnalysisConfig.shouldTriggerAnalysis(action)) {
+            log.debug("Webhook analysis disabled or action '{}' not in trigger list", action);
+            return;
+        }
+
+        try {
+            log.info("Triggering automatic analysis for PR {} (action={}) via webhook",
+                    pullRequestId, action);
+
+            unifiedAnalysisService.analyzeAndStore(
+                    pullRequestId,
+                    webhookAnalysisConfig.getProvider(),
+                    null,  // no explicit token, will use user's stored token
+                    webhookAnalysisConfig.isIncludeDiff()
+            );
+
+            log.info("Automatic analysis completed for PR {} ({}#{})",
+                    pullRequestId, repositoryFullName, pullRequestId);
+
+        } catch (Exception ex) {
+            log.error("Automatic analysis failed for PR {} (action={}): {}",
+                    pullRequestId, action, ex.getMessage());
+            // Don't re-throw; async failures should be logged but not crash the webhook response
+        }
+    }
 }
+
