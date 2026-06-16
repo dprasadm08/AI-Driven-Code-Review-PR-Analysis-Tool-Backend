@@ -18,15 +18,22 @@ import com.aiprreview.dto.analysis.ManualPrAnalysisRequest;
 import com.aiprreview.dto.analysis.UnifiedAnalysisResponse;
 import com.aiprreview.dto.pullrequest.PullRequestWithFilesResponse;
 import com.aiprreview.entity.AnalysisResult;
+import com.aiprreview.entity.User;
 import com.aiprreview.exception.AnalysisException;
 import com.aiprreview.exception.ResourceNotFoundException;
+import com.aiprreview.repository.UserRepository;
 import com.aiprreview.service.AnalysisService;
 import com.aiprreview.service.PullRequestService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -48,6 +55,7 @@ public class AnalysisController {
     private final TestCaseAnalysisService testCaseAnalysisService;
     private final UnifiedAnalysisService unifiedAnalysisService;
     private final AnalysisService analysisService;
+    private final UserRepository userRepository;
     private final PullRequestService pullRequestService;
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -109,6 +117,56 @@ public class AnalysisController {
         log.info("Fetching analysis results for PR: {}", prId);
         List<AnalysisResult> results = unifiedAnalysisService.getResultsForPullRequest(prId);
         return ResponseEntity.ok(results);
+    }
+
+    @GetMapping("/history")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<Map<String, Object>> getMyAnalysisHistory(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+        validatePagination(page, size);
+        String userId = getCurrentUserId();
+        Pageable pageable = buildPageable(page, size, sortBy, sortDir);
+        Page<AnalysisResult> history = analysisService.getResultsForUser(userId, pageable);
+        return ResponseEntity.ok(buildPagedResponse(history, page, size, sortBy, sortDir));
+    }
+
+    @GetMapping("/history/pull-request/{prId}")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<Map<String, Object>> getPullRequestAnalysisHistory(
+            @PathVariable String prId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+        if (prId == null || prId.isBlank()) {
+            throw new IllegalArgumentException("prId path variable must not be blank");
+        }
+        validatePagination(page, size);
+        String userId = getCurrentUserId();
+        Pageable pageable = buildPageable(page, size, sortBy, sortDir);
+        Page<AnalysisResult> history = analysisService.getResultsForPullRequestAndUser(prId, userId, pageable);
+        return ResponseEntity.ok(buildPagedResponse(history, page, size, sortBy, sortDir));
+    }
+
+    @GetMapping("/history/repository/{repositoryId}")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<Map<String, Object>> getRepositoryAnalysisHistory(
+            @PathVariable String repositoryId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+        if (repositoryId == null || repositoryId.isBlank()) {
+            throw new IllegalArgumentException("repositoryId path variable must not be blank");
+        }
+        validatePagination(page, size);
+        String userId = getCurrentUserId();
+        Pageable pageable = buildPageable(page, size, sortBy, sortDir);
+        Page<AnalysisResult> history = analysisService.getResultsForRepositoryAndUser(repositoryId, userId, pageable);
+        return ResponseEntity.ok(buildPagedResponse(history, page, size, sortBy, sortDir));
     }
 
     @GetMapping("/status/{analysisId}")
@@ -305,181 +363,48 @@ public class AnalysisController {
         response.put("rawReply", result.rawReply());
         return response;
     }
-}
 
+    private void validatePagination(int page, int size) {
+        if (page < 0) {
+            throw new IllegalArgumentException("page must be >= 0");
+        }
+        if (size <= 0 || size > 100) {
+            throw new IllegalArgumentException("size must be between 1 and 100");
+        }
+    }
 
-@Slf4j
-@RestController
-@RequestMapping("/analysis")
-@RequiredArgsConstructor
-public class AnalysisController {
+    private Pageable buildPageable(int page, int size, String sortBy, String sortDir) {
+        Sort.Direction direction = "asc".equalsIgnoreCase(sortDir)
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
+        return PageRequest.of(page, size, Sort.by(direction, sortBy));
+    }
 
-    private final OpenAiService openAiService;
-    private final AiProviderRouter aiProviderRouter;
-    private final BugAnalysisService bugAnalysisService;
-    private final SecurityAnalysisService securityAnalysisService;
-    private final PerformanceAnalysisService performanceAnalysisService;
-    private final CodeQualityAnalysisService codeQualityAnalysisService;
-    private final TestCaseAnalysisService testCaseAnalysisService;
-    private final UnifiedAnalysisService unifiedAnalysisService;
-    private final PullRequestService pullRequestService;
+    private String getCurrentUserId() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found: " + username));
+        return user.getId();
+    }
 
-    @PostMapping("/trigger")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> triggerAnalysis(@RequestBody Map<String, String> request) {
-        log.info("Triggering analysis for PR: {}", request.get("prId"));
+    private Map<String, Object> buildPagedResponse(
+            Page<AnalysisResult> pageResult,
+            int page,
+            int size,
+            String sortBy,
+            String sortDir) {
         Map<String, Object> response = new HashMap<>();
-        response.put("message", "Protected endpoint - AI analysis would be triggered");
-        response.put("prId", request.get("prId"));
-        response.put("status", "queued");
-        return ResponseEntity.ok(response);
-    }
-
-    @GetMapping("/results/{prId}")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> getAnalysisResults(@PathVariable String prId) {
-        log.info("Fetching analysis results for PR: {}", prId);
-        List<AnalysisResult> results = unifiedAnalysisService.getResultsForPullRequest(prId);
-        return ResponseEntity.ok(results);
-    }
-
-    @GetMapping("/status/{analysisId}")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> getAnalysisStatus(@PathVariable String analysisId) {
-        log.info("Fetching analysis status: {}", analysisId);
-        Map<String, Object> response = new HashMap<>();
-        response.put("message", "Protected endpoint - requires authentication");
-        response.put("analysisId", analysisId);
-        response.put("status", "completed");
-        return ResponseEntity.ok(response);
-    }
-
-    @GetMapping("/test/openai")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> testOpenAiConnectivity() {
-        log.info("Testing OpenAI API connectivity");
-        AiProvider.ConnectivityResult result = openAiService.testConnectivity();
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", result.success());
-        response.put("provider", result.provider());
-        response.put("model", result.model());
-        response.put("message", result.message());
-        response.put("rawReply", result.rawReply());
-        return result.success() ? ResponseEntity.ok(response) : ResponseEntity.status(503).body(response);
-    }
-
-    @GetMapping("/test/claude")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> testClaudeConnectivity() {
-        log.info("Testing Claude API connectivity");
-        AiProvider provider = aiProviderRouter.resolveProvider("claude");
-        AiProvider.ConnectivityResult result = provider.testConnectivity();
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", result.success());
-        response.put("provider", result.provider());
-        response.put("model", result.model());
-        response.put("message", result.message());
-        response.put("rawReply", result.rawReply());
-        return result.success() ? ResponseEntity.ok(response) : ResponseEntity.status(503).body(response);
-    }
-
-    @GetMapping("/test/provider")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> testProviderSwitch(@RequestParam(required = false) String provider) {
-        AiProvider selected = aiProviderRouter.resolveProvider(provider);
-        AiProvider.ConnectivityResult result = selected.testConnectivity();
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("requestedProvider", provider);
-        response.put("selectedProvider", selected.getProviderName());
-        response.put("availableProviders", aiProviderRouter.getAvailableProviders());
-        response.put("success", result.success());
-        response.put("model", result.model());
-        response.put("message", result.message());
-        response.put("rawReply", result.rawReply());
-
-        return result.success() ? ResponseEntity.ok(response) : ResponseEntity.status(503).body(response);
-    }
-
-    @PostMapping("/bugs/{pullRequestId}")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> detectBugs(
-            @PathVariable String pullRequestId,
-            @RequestParam(required = false) String provider,
-            @RequestParam(required = false) String token,
-            @RequestParam(defaultValue = "false") boolean includeDiff) {
-        log.info("Running bug detection on PR id={} provider={}", pullRequestId, provider);
-        PullRequestWithFilesResponse prDetail = pullRequestService.getPullRequestWithFiles(pullRequestId, token, includeDiff);
-        BugAnalysisResult result = bugAnalysisService.analyze(prDetail, provider);
-        return ResponseEntity.ok(result);
-    }
-
-    @PostMapping("/security/{pullRequestId}")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> detectSecurityVulnerabilities(
-            @PathVariable String pullRequestId,
-            @RequestParam(required = false) String provider,
-            @RequestParam(required = false) String token,
-            @RequestParam(defaultValue = "false") boolean includeDiff) {
-        log.info("Running security analysis on PR id={} provider={}", pullRequestId, provider);
-        PullRequestWithFilesResponse prDetail = pullRequestService.getPullRequestWithFiles(pullRequestId, token, includeDiff);
-        SecurityAnalysisResult result = securityAnalysisService.analyze(prDetail, provider);
-        return ResponseEntity.ok(result);
-    }
-
-    @PostMapping("/performance/{pullRequestId}")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> detectPerformanceIssues(
-            @PathVariable String pullRequestId,
-            @RequestParam(required = false) String provider,
-            @RequestParam(required = false) String token,
-            @RequestParam(defaultValue = "false") boolean includeDiff) {
-        log.info("Running performance analysis on PR id={} provider={}", pullRequestId, provider);
-        PullRequestWithFilesResponse prDetail = pullRequestService.getPullRequestWithFiles(pullRequestId, token, includeDiff);
-        PerformanceAnalysisResult result = performanceAnalysisService.analyze(prDetail, provider);
-        return ResponseEntity.ok(result);
-    }
-
-    @PostMapping("/code-quality/{pullRequestId}")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> detectCodeSmells(
-            @PathVariable String pullRequestId,
-            @RequestParam(required = false) String provider,
-            @RequestParam(required = false) String token,
-            @RequestParam(defaultValue = "false") boolean includeDiff) {
-        log.info("Running code-quality analysis on PR id={} provider={}", pullRequestId, provider);
-        PullRequestWithFilesResponse prDetail = pullRequestService.getPullRequestWithFiles(pullRequestId, token, includeDiff);
-        CodeQualityAnalysisResult result = codeQualityAnalysisService.analyze(prDetail, provider);
-        return ResponseEntity.ok(result);
-    }
-
-    @PostMapping("/test-cases/{pullRequestId}")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> analyzeTestCoverage(
-            @PathVariable String pullRequestId,
-            @RequestParam(required = false) String provider,
-            @RequestParam(required = false) String token,
-            @RequestParam(defaultValue = "false") boolean includeDiff) {
-        log.info("Running test-case analysis on PR id={} provider={}", pullRequestId, provider);
-        PullRequestWithFilesResponse prDetail = pullRequestService.getPullRequestWithFiles(pullRequestId, token, includeDiff);
-        TestCaseAnalysisResult result = testCaseAnalysisService.analyze(prDetail, provider);
-        return ResponseEntity.ok(result);
-    }
-
-    @PostMapping("/full/{pullRequestId}")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> runUnifiedAnalysis(
-            @PathVariable String pullRequestId,
-            @RequestParam(required = false) String provider,
-            @RequestParam(required = false) String token,
-            @RequestParam(defaultValue = "false") boolean includeDiff) {
-        log.info("Running unified analysis on PR id={} provider={}", pullRequestId, provider);
-        UnifiedAnalysisResponse result = unifiedAnalysisService.analyzeAndStore(
-                pullRequestId,
-                provider,
-                token,
-                includeDiff
-        );
-        return ResponseEntity.ok(result);
+        response.put("content", pageResult.getContent());
+        response.put("page", page);
+        response.put("size", size);
+        response.put("totalElements", pageResult.getTotalElements());
+        response.put("totalPages", pageResult.getTotalPages());
+        response.put("first", pageResult.isFirst());
+        response.put("last", pageResult.isLast());
+        response.put("hasNext", pageResult.hasNext());
+        response.put("hasPrevious", pageResult.hasPrevious());
+        response.put("sortBy", sortBy);
+        response.put("sortDir", sortDir);
+        return response;
     }
 }

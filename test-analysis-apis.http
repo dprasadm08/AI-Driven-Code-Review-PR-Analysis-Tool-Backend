@@ -169,3 +169,25 @@ GET {{baseUrl}}/analysis/test/provider?provider=openai
 Authorization: Bearer {{token}}
 
 ###
+
+###############################################
+### Analysis History APIs (Pagination)
+###############################################
+
+### 19. Get current user's paginated analysis history
+GET {{baseUrl}}/analysis/history?page=0&size=10&sortBy=createdAt&sortDir=desc
+Authorization: Bearer {{token}}
+
+###
+
+### 20. Get paginated analysis history for a pull request
+GET {{baseUrl}}/analysis/history/pull-request/{{prId}}?page=0&size=5&sortBy=createdAt&sortDir=desc
+Authorization: Bearer {{token}}
+
+###
+
+### 21. Get paginated analysis history for a repository
+GET {{baseUrl}}/analysis/history/repository/YOUR_REPOSITORY_ID_HERE?page=0&size=5&sortBy=createdAt&sortDir=desc
+Authorization: Bearer {{token}}
+
+###

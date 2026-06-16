@@ -16,6 +16,8 @@ import com.aiprreview.repository.AnalysisResultRepository;
 import com.aiprreview.repository.PullRequestRepository;
 import com.aiprreview.repository.RepositoryRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -84,6 +86,18 @@ public class AnalysisService {
 
 	public List<AnalysisResult> getResultsForPullRequest(String pullRequestId) {
 		return resultRepository.findByPullRequestId(pullRequestId);
+	}
+
+	public Page<AnalysisResult> getResultsForUser(String userId, Pageable pageable) {
+		return resultRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+	}
+
+	public Page<AnalysisResult> getResultsForPullRequestAndUser(String pullRequestId, String userId, Pageable pageable) {
+		return resultRepository.findByPullRequestIdAndUserIdOrderByCreatedAtDesc(pullRequestId, userId, pageable);
+	}
+
+	public Page<AnalysisResult> getResultsForRepositoryAndUser(String repositoryId, String userId, Pageable pageable) {
+		return resultRepository.findByRepositoryIdAndUserIdOrderByCreatedAtDesc(repositoryId, userId, pageable);
 	}
 
 	public PromptBuilderService.PromptBuildResult buildPromptForRequest(String requestId) {
