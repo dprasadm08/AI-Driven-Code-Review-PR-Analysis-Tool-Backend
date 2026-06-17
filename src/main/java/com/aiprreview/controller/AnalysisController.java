@@ -189,6 +189,36 @@ public class AnalysisController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/details/{analysisId}")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<Map<String, Object>> getAnalysisDetails(@PathVariable String analysisId) {
+        if (analysisId == null || analysisId.isBlank()) {
+            throw new IllegalArgumentException("analysisId path variable must not be blank");
+        }
+
+        String userId = getCurrentUserId();
+        log.info("Fetching analysis details for id={} userId={}", analysisId, userId);
+
+        AnalysisResult result = analysisService.getAnalysisResultByIdForUser(analysisId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Analysis result not found: " + analysisId));
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("analysisId", result.getId());
+        response.put("analysisRequestId", result.getAnalysisRequestId());
+        response.put("pullRequestId", result.getPullRequestId());
+        response.put("repositoryId", result.getRepositoryId());
+        response.put("status", result.getStatus());
+        response.put("summary", result.getSummary());
+        response.put("model", result.getModel());
+        response.put("modelVersion", result.getModelVersion());
+        response.put("score", result.getScore());
+        response.put("createdAt", result.getCreatedAt());
+        response.put("completedAt", result.getCompletedAt());
+        response.put("findings", result.getFindings());
+        response.put("rawOutput", result.getRawOutput());
+        return ResponseEntity.ok(response);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // AI provider connectivity tests
     // ─────────────────────────────────────────────────────────────────────────

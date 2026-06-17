@@ -104,6 +104,18 @@ Authorization: Bearer {{token}}
 
 ###
 
+### 9a. Get analysis details by result ID (includes stored findings)
+GET {{baseUrl}}/analysis/details/{{analysisId}}
+Authorization: Bearer {{token}}
+
+###
+
+### 9b. Details - not found (Should return 404)
+GET {{baseUrl}}/analysis/details/000000000000000000000000
+Authorization: Bearer {{token}}
+
+###
+
 ###############################################
 ### Unified Full Analysis
 ###############################################

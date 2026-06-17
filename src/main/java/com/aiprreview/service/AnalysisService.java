@@ -84,6 +84,10 @@ public class AnalysisService {
 		return resultRepository.findById(id);
 	}
 
+	public Optional<AnalysisResult> getAnalysisResultByIdForUser(String id, String userId) {
+		return resultRepository.findByIdAndUserId(id, userId);
+	}
+
 	public List<AnalysisResult> getResultsForPullRequest(String pullRequestId) {
 		return resultRepository.findByPullRequestId(pullRequestId);
 	}

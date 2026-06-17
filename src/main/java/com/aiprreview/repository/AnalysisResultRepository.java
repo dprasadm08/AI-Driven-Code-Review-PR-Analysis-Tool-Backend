@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface AnalysisResultRepository extends MongoRepository<AnalysisResult, String> {
@@ -16,6 +17,8 @@ public interface AnalysisResultRepository extends MongoRepository<AnalysisResult
     List<AnalysisResult> findByPullRequestId(String pullRequestId);
 
     List<AnalysisResult> findByUserId(String userId);
+
+    Optional<AnalysisResult> findByIdAndUserId(String id, String userId);
 
         Page<AnalysisResult> findByUserIdOrderByCreatedAtDesc(String userId, Pageable pageable);
 
