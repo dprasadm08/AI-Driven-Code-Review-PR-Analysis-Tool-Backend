@@ -14,6 +14,7 @@ import com.aiprreview.entity.User;
 import com.aiprreview.exception.GithubApiException;
 import com.aiprreview.exception.ResourceNotFoundException;
 import com.aiprreview.github.GithubApiClient;
+import org.springframework.security.access.AccessDeniedException;
 import com.aiprreview.repository.PullRequestRepository;
 import com.aiprreview.repository.RepositoryRepository;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +50,7 @@ public class PullRequestService {
         
         // Verify ownership
         if (!repository.getUserId().equals(currentUser.getId())) {
-            throw new IllegalArgumentException("You don't have access to this repository");
+            throw new AccessDeniedException("You do not have access to this repository");
         }
         
         String token = githubToken != null ? githubToken : currentUser.getGithubToken();
@@ -104,7 +105,7 @@ public class PullRequestService {
                 .orElseThrow(() -> new ResourceNotFoundException("Repository not found with id: " + repositoryId));
         
         if (!repository.getUserId().equals(currentUser.getId())) {
-            throw new IllegalArgumentException("You don't have access to this repository");
+            throw new AccessDeniedException("You do not have access to this repository");
         }
         
         String token = githubToken != null ? githubToken : currentUser.getGithubToken();
@@ -164,7 +165,7 @@ public class PullRequestService {
                 .orElseThrow(() -> new ResourceNotFoundException("Repository not found with id: " + repositoryId));
         
         if (!repository.getUserId().equals(currentUser.getId())) {
-            throw new IllegalArgumentException("You don't have access to this repository");
+            throw new AccessDeniedException("You do not have access to this repository");
         }
         
         List<PullRequest> pullRequests;
@@ -189,7 +190,7 @@ public class PullRequestService {
                 .orElseThrow(() -> new ResourceNotFoundException("Pull request not found with id: " + id));
         
         if (!pullRequest.getUserId().equals(currentUser.getId())) {
-            throw new IllegalArgumentException("You don't have access to this pull request");
+            throw new AccessDeniedException("You do not have access to this pull request");
         }
         
         RepositoryEntity repository = repositoryRepository.findById(pullRequest.getRepositoryId())
@@ -208,7 +209,7 @@ public class PullRequestService {
                 .orElseThrow(() -> new ResourceNotFoundException("Pull request not found with id: " + id));
         
         if (!pullRequest.getUserId().equals(currentUser.getId())) {
-            throw new IllegalArgumentException("You don't have access to this pull request");
+            throw new AccessDeniedException("You do not have access to this pull request");
         }
         
         RepositoryEntity repository = repositoryRepository.findById(pullRequest.getRepositoryId())
@@ -296,7 +297,7 @@ public class PullRequestService {
                 .orElseThrow(() -> new ResourceNotFoundException("Repository not found with id: " + repositoryId));
         
         if (!repository.getUserId().equals(currentUser.getId())) {
-            throw new IllegalArgumentException("You don't have access to this repository");
+            throw new AccessDeniedException("You do not have access to this repository");
         }
         
         if (state != null && !state.isEmpty()) {

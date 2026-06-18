@@ -8,11 +8,15 @@ import com.aiprreview.entity.PullRequest;
 import com.aiprreview.exception.ResourceNotFoundException;
 import com.aiprreview.repository.AnalysisResultRepository;
 import com.aiprreview.repository.PullRequestRepository;
+import com.aiprreview.service.AuthService;
 import com.aiprreview.service.PullRequestService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -31,6 +35,7 @@ public class UnifiedAnalysisService {
     private final PullRequestService pullRequestService;
     private final PullRequestRepository pullRequestRepository;
     private final AnalysisResultRepository analysisResultRepository;
+    private final AuthService authService;
     private final BugAnalysisService bugAnalysisService;
     private final SecurityAnalysisService securityAnalysisService;
     private final PerformanceAnalysisService performanceAnalysisService;
@@ -46,6 +51,15 @@ public class UnifiedAnalysisService {
 
         PullRequest pullRequest = pullRequestRepository.findById(pullRequestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pull request not found with id: " + pullRequestId));
+
+        // Validate ownership when an authenticated user is present (skip for system/webhook async calls)
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+            String currentUserId = authService.getCurrentUser().getId();
+            if (!pullRequest.getUserId().equals(currentUserId)) {
+                throw new AccessDeniedException("You do not have access to this pull request");
+            }
+        }
 
         pullRequest.setAnalysisStatus("in_progress");
         pullRequest.setUpdatedAt(LocalDateTime.now());
