@@ -3,18 +3,28 @@ package com.aiprreview.ai;
 import com.aiprreview.config.ClaudeConfig;
 import com.aiprreview.dto.claude.ClaudeRequest;
 import com.aiprreview.dto.claude.ClaudeResponse;
+import io.netty.channel.ChannelOption;
+import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.handler.timeout.WriteTimeoutHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.netty.http.client.HttpClient;
+import reactor.util.retry.Retry;
 
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Slf4j
 @Service
@@ -56,6 +66,7 @@ public class ClaudeService implements AiProvider {
 					.retrieve()
 					.bodyToMono(ClaudeResponse.class)
 					.timeout(Duration.ofSeconds(claudeConfig.getTimeoutSeconds()))
+					.retryWhen(buildRetrySpec())
 					.block();
 
 			if (response == null) {
@@ -65,6 +76,11 @@ public class ClaudeService implements AiProvider {
 		} catch (WebClientResponseException ex) {
 			log.error("Claude API error: status={} body={}", ex.getStatusCode(), ex.getResponseBodyAsString());
 			throw new ClaudeException("Claude API returned error " + ex.getStatusCode() + ": " + ex.getResponseBodyAsString(), ex);
+		} catch (TimeoutException ex) {
+			throw new ClaudeException(
+					"Claude request timed out after " + claudeConfig.getTimeoutSeconds() + " seconds", ex);
+		} catch (WebClientRequestException ex) {
+			throw new ClaudeException("Network error calling Claude API: " + ex.getMessage(), ex);
 		} catch (ClaudeException ex) {
 			throw ex;
 		} catch (Exception ex) {
@@ -108,6 +124,7 @@ public class ClaudeService implements AiProvider {
 					.retrieve()
 					.bodyToMono(ClaudeResponse.class)
 					.timeout(Duration.ofSeconds(15))
+					.retryWhen(buildRetrySpec())
 					.block();
 
 			if (response != null && response.getContent() != null && !response.getContent().isEmpty()) {
@@ -123,12 +140,47 @@ public class ClaudeService implements AiProvider {
 	}
 
 	private WebClient createWebClient() {
+		HttpClient httpClient = HttpClient.create()
+				.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, claudeConfig.getConnectTimeoutMillis())
+				.responseTimeout(Duration.ofSeconds(claudeConfig.getReadTimeoutSeconds()))
+				.doOnConnected(conn -> conn
+						.addHandlerLast(new ReadTimeoutHandler(claudeConfig.getReadTimeoutSeconds(), TimeUnit.SECONDS))
+						.addHandlerLast(new WriteTimeoutHandler(claudeConfig.getWriteTimeoutSeconds(), TimeUnit.SECONDS)));
+
 		return WebClient.builder()
 				.baseUrl(claudeConfig.getBaseUrl())
 				.defaultHeader("x-api-key", claudeConfig.getApiKey())
 				.defaultHeader("anthropic-version", claudeConfig.getAnthropicVersion())
 				.defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+				.clientConnector(new ReactorClientHttpConnector(httpClient))
 				.build();
+	}
+
+	private Retry buildRetrySpec() {
+		return Retry.backoff(claudeConfig.getRetryAttempts(), Duration.ofMillis(claudeConfig.getRetryBackoffMillis()))
+				.maxBackoff(Duration.ofMillis(claudeConfig.getRetryMaxBackoffMillis()))
+				.filter(this::isRetryable)
+				.doBeforeRetry(signal -> log.warn(
+						"Retrying Claude request attempt={} reason={}",
+						signal.totalRetries() + 1,
+						signal.failure().getMessage()
+				));
+	}
+
+	private boolean isRetryable(Throwable throwable) {
+		if (throwable instanceof TimeoutException) {
+			return true;
+		}
+		if (throwable instanceof WebClientRequestException) {
+			return true;
+		}
+		if (throwable instanceof WebClientResponseException ex) {
+			HttpStatus status = ex.getStatusCode();
+			return status.is5xxServerError()
+					|| status.value() == 429
+					|| status.value() == 408;
+		}
+		return false;
 	}
 
 	private void validateApiKey() {

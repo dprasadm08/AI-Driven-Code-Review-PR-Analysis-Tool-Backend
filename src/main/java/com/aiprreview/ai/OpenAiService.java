@@ -5,15 +5,25 @@ import com.aiprreview.dto.openai.OpenAiRequest;
 import com.aiprreview.dto.openai.OpenAiRequest.Message;
 import com.aiprreview.dto.openai.OpenAiRequest.ResponseFormat;
 import com.aiprreview.dto.openai.OpenAiResponse;
+import io.netty.channel.ChannelOption;
+import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.handler.timeout.WriteTimeoutHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.netty.http.client.HttpClient;
+import reactor.util.retry.Retry;
 
 import java.time.Duration;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.TimeUnit;
 import java.util.List;
 
 @Slf4j
@@ -70,6 +80,7 @@ public class OpenAiService implements AiProvider {
                     .retrieve()
                     .bodyToMono(OpenAiResponse.class)
                     .timeout(Duration.ofSeconds(openAiConfig.getTimeoutSeconds()))
+                    .retryWhen(buildRetrySpec())
                     .block();
 
             if (response == null) {
@@ -86,6 +97,11 @@ public class OpenAiService implements AiProvider {
         } catch (WebClientResponseException ex) {
             log.error("OpenAI API error: status={} body={}", ex.getStatusCode(), ex.getResponseBodyAsString());
             throw new OpenAiException("OpenAI API returned error " + ex.getStatusCode() + ": " + ex.getResponseBodyAsString(), ex);
+        } catch (TimeoutException ex) {
+            throw new OpenAiException(
+                    "OpenAI request timed out after " + openAiConfig.getTimeoutSeconds() + " seconds", ex);
+        } catch (WebClientRequestException ex) {
+            throw new OpenAiException("Network error calling OpenAI API: " + ex.getMessage(), ex);
         } catch (OpenAiException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -133,6 +149,7 @@ public class OpenAiService implements AiProvider {
                     .retrieve()
                     .bodyToMono(OpenAiResponse.class)
                     .timeout(Duration.ofSeconds(15))
+                    .retryWhen(buildRetrySpec())
                     .block();
 
             if (response != null && response.getChoices() != null && !response.getChoices().isEmpty()) {
@@ -153,11 +170,46 @@ public class OpenAiService implements AiProvider {
     // ----------------------------------------------------------------
 
     private WebClient createWebClient() {
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, openAiConfig.getConnectTimeoutMillis())
+                .responseTimeout(Duration.ofSeconds(openAiConfig.getReadTimeoutSeconds()))
+                .doOnConnected(conn -> conn
+                        .addHandlerLast(new ReadTimeoutHandler(openAiConfig.getReadTimeoutSeconds(), TimeUnit.SECONDS))
+                        .addHandlerLast(new WriteTimeoutHandler(openAiConfig.getWriteTimeoutSeconds(), TimeUnit.SECONDS)));
+
         return WebClient.builder()
                 .baseUrl(openAiConfig.getBaseUrl())
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + openAiConfig.getApiKey())
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .build();
+    }
+
+    private Retry buildRetrySpec() {
+        return Retry.backoff(openAiConfig.getRetryAttempts(), Duration.ofMillis(openAiConfig.getRetryBackoffMillis()))
+                .maxBackoff(Duration.ofMillis(openAiConfig.getRetryMaxBackoffMillis()))
+                .filter(this::isRetryable)
+                .doBeforeRetry(signal -> log.warn(
+                        "Retrying OpenAI request attempt={} reason={}",
+                        signal.totalRetries() + 1,
+                        signal.failure().getMessage()
+                ));
+    }
+
+    private boolean isRetryable(Throwable throwable) {
+        if (throwable instanceof TimeoutException) {
+            return true;
+        }
+        if (throwable instanceof WebClientRequestException) {
+            return true;
+        }
+        if (throwable instanceof WebClientResponseException ex) {
+            HttpStatus status = ex.getStatusCode();
+            return status.is5xxServerError()
+                    || status.value() == 429
+                    || status.value() == 408;
+        }
+        return false;
     }
 
     private void validateApiKey() {
