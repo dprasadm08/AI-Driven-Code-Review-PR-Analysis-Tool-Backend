@@ -1,11 +1,11 @@
 package com.aiprreview.dto.analysis;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import java.util.List;
 
 @Data
 @Builder
@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 public class ManualPrAnalysisRequest {
 
     @NotBlank(message = "pullRequestId is required")
+    @Size(min = 1, max = 255, message = "pullRequestId must be between 1 and 255 characters")
     private String pullRequestId;
 
     /**
@@ -27,6 +28,7 @@ public class ManualPrAnalysisRequest {
      * Optional GitHub personal access token.
      * Falls back to the token stored on the authenticated user account.
      */
+    @Size(max = 255, message = "GitHub token must not exceed 255 characters")
     private String githubToken;
 
     /**
@@ -38,7 +40,8 @@ public class ManualPrAnalysisRequest {
      * Analysis modules to run. Null / empty means run ALL five modules.
      * Valid values: bug, security, performance, code_quality, test_case
      */
-    private java.util.List<
+    @Size(max = 5, message = "Cannot request more than 5 analysis modules")
+    private List<
             @Pattern(regexp = "^(bug|security|performance|code_quality|test_case)$",
                      message = "Each module must be one of: bug, security, performance, code_quality, test_case")
             String> modules;
