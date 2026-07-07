@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ai-pr-review-backend:latest
+    container_name: ai-pr-review-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/ai-pr-review
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx768m}
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:7
+    container_name: ai-pr-review-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:

@@ -1,38 +1,32 @@
 # Multi-stage build for Spring Boot application
-FROM eclipse-temurin:17-jdk-alpine AS build
+FROM eclipse-temurin:17-jdk-jammy AS build
 WORKDIR /workspace/app
 
-# Copy Maven wrapper and pom.xml
-COPY mvnw .
-COPY .mvn .mvn
-COPY pom.xml .
+# Copy Maven wrapper and project metadata first to maximize layer caching.
+COPY .mvn/ .mvn/
+COPY mvnw pom.xml ./
+RUN chmod +x mvnw
 
-# Download dependencies
-RUN ./mvnw dependency:go-offline -B
+# Download dependencies before copying source.
+RUN ./mvnw -B dependency:go-offline
 
-# Copy source code
-COPY src src
+# Copy source and build jar.
+COPY src/ src/
+RUN ./mvnw -B clean package -DskipTests
 
-# Build application
-RUN ./mvnw clean package -DskipTests
+# Runtime image
+FROM eclipse-temurin:17-jre-jammy
+WORKDIR /app
 
-# Extract layers
-RUN mkdir -p target/dependency && (cd target/dependency; jar -xf ../*.jar)
-
-# Production stage
-FROM eclipse-temurin:17-jre-alpine
-VOLUME /tmp
-
-# Create non-root user
-RUN addgroup -S spring && adduser -S spring -G spring
+# Run as non-root user.
+RUN groupadd --system spring && useradd --system --gid spring spring
 USER spring:spring
 
-# Copy application from build stage
-ARG DEPENDENCY=/workspace/app/target/dependency
-COPY --from=build ${DEPENDENCY}/BOOT-INF/lib /app/lib
-COPY --from=build ${DEPENDENCY}/META-INF /app/META-INF
-COPY --from=build ${DEPENDENCY}/BOOT-INF/classes /app
+COPY --from=build /workspace/app/target/*.jar /app/app.jar
 
 EXPOSE 8080
 
-ENTRYPOINT ["java","-cp","app:app/lib/*","com.aiprreview.AiPrReviewApplication"]
+ENV JAVA_OPTS="" \
+	SPRING_PROFILES_ACTIVE=default
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
