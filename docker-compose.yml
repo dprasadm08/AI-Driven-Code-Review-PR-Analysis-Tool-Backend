@@ -1,34 +1,98 @@
 version: "3.9"
 
+# ──────────────────────────────────────────────
+#  AI-Driven Code Review – Backend Compose Stack
+# ──────────────────────────────────────────────
+# Usage:
+#   docker compose up --build          # first run
+#   docker compose up -d               # detached
+#   docker compose down -v             # destroy volumes
+#
+# Required env vars (set in .env or shell):
+#   JWT_SECRET, OPENAI_API_KEY, CLAUDE_API_KEY,
+#   GITHUB_TOKEN, GITHUB_WEBHOOK_SECRET
+# ──────────────────────────────────────────────
+
 services:
+
+  # ── MongoDB ─────────────────────────────────
+  mongodb:
+    image: mongo:7
+    container_name: ai-pr-review-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"           # host:container – disable in production
+    environment:
+      MONGO_INITDB_DATABASE: ai-pr-review
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - backend-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Spring Boot Backend ──────────────────────
   backend:
     build:
       context: .
       dockerfile: Dockerfile
     image: ai-pr-review-backend:latest
     container_name: ai-pr-review-backend
+    restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
+      # MongoDB – resolved via Docker DNS (service name = mongodb)
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/ai-pr-review
+
+      # JWT
       JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+
+      # AI Providers
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       CLAUDE_API_KEY: ${CLAUDE_API_KEY:-}
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+
+      # GitHub
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
-      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx768m}
+
+      # Webhook auto-analysis
+      WEBHOOK_ANALYSIS_ENABLED: ${WEBHOOK_ANALYSIS_ENABLED:-true}
+      WEBHOOK_ANALYSIS_PROVIDER: ${WEBHOOK_ANALYSIS_PROVIDER:-openai}
+      WEBHOOK_ANALYSIS_INCLUDE_DIFF: ${WEBHOOK_ANALYSIS_INCLUDE_DIFF:-false}
+
+      # JVM tuning
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx768m -XX:+UseContainerSupport}
+
+      # Active Spring profile
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
     depends_on:
-      - mongodb
-    restart: unless-stopped
+      mongodb:
+        condition: service_healthy   # only start after Mongo is ready
+    networks:
+      - backend-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
 
-  mongodb:
-    image: mongo:7
-    container_name: ai-pr-review-mongodb
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-    restart: unless-stopped
+# ── Named network (bridge, isolated) ────────────
+networks:
+  backend-net:
+    driver: bridge
+    name: ai-pr-review-network
 
+# ── Persistent volumes ───────────────────────────
 volumes:
   mongodb_data:
+    name: ai-pr-review-mongodb-data
+  mongodb_config:
+    name: ai-pr-review-mongodb-config
