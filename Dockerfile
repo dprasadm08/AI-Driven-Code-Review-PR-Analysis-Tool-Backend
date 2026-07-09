@@ -18,6 +18,10 @@ RUN ./mvnw -B clean package -DskipTests
 FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
+# Install curl for healthcheck, then remove apt cache to keep layer small.
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Run as non-root user.
 RUN groupadd --system spring && useradd --system --gid spring spring
 USER spring:spring
