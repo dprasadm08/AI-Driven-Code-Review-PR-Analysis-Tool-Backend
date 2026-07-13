@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -16,6 +18,11 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "analysis_results")
+@CompoundIndexes({
+    @CompoundIndex(name = "user_created_idx", def = "{'userId': 1, 'createdAt': -1}"),
+    @CompoundIndex(name = "pr_user_created_idx", def = "{'pullRequestId': 1, 'userId': 1, 'createdAt': -1}"),
+    @CompoundIndex(name = "repo_user_created_idx", def = "{'repositoryId': 1, 'userId': 1, 'createdAt': -1}")
+})
 public class AnalysisResult {
 
     @Id

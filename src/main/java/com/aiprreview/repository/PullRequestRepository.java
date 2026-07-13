@@ -25,6 +25,8 @@ public interface PullRequestRepository extends MongoRepository<PullRequest, Stri
     
     // Find by PR number
     Optional<PullRequest> findByRepositoryIdAndPrNumber(String repositoryId, Integer prNumber);
+
+    Optional<PullRequest> findByIdAndUserId(String id, String userId);
     
     // Find by state
     List<PullRequest> findByRepositoryIdAndState(String repositoryId, String state);

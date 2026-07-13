@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -18,6 +19,12 @@ import java.util.List;
 @AllArgsConstructor
 @Document(collection = "pull_requests")
 @CompoundIndex(name = "repo_pr_idx", def = "{'repositoryId': 1, 'prNumber': 1}", unique = true)
+@CompoundIndexes({
+    @CompoundIndex(name = "user_created_idx", def = "{'userId': 1, 'createdAt': -1}"),
+    @CompoundIndex(name = "repo_created_idx", def = "{'repositoryId': 1, 'createdAt': -1}"),
+    @CompoundIndex(name = "user_state_idx", def = "{'userId': 1, 'state': 1}"),
+    @CompoundIndex(name = "repo_state_idx", def = "{'repositoryId': 1, 'state': 1}")
+})
 public class PullRequest {
 
     @Id

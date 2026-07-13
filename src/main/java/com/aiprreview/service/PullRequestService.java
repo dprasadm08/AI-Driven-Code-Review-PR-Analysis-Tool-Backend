@@ -24,7 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -43,21 +47,9 @@ public class PullRequestService {
     @Transactional
     public List<PullRequestResponse> syncRepositoryPullRequests(String repositoryId, String state, String githubToken) {
         User currentUser = authService.getCurrentUser();
-        
-        // Get repository
-        RepositoryEntity repository = repositoryRepository.findById(repositoryId)
-                .orElseThrow(() -> new ResourceNotFoundException("Repository not found with id: " + repositoryId));
-        
-        // Verify ownership
-        if (!repository.getUserId().equals(currentUser.getId())) {
-            throw new AccessDeniedException("You do not have access to this repository");
-        }
-        
-        String token = githubToken != null ? githubToken : currentUser.getGithubToken();
-        
-        if (token == null || token.isEmpty()) {
-            throw new GithubApiException("GitHub token is required. Please provide a token or set it in your profile.");
-        }
+        RepositoryEntity repository = findOwnedRepository(repositoryId, currentUser.getId());
+        String token = resolveGithubToken(githubToken, currentUser.getGithubToken(),
+                "GitHub token is required. Please provide a token or set it in your profile.");
         
         log.info("Syncing pull requests for repository: {}", repository.getFullName());
         
@@ -100,15 +92,9 @@ public class PullRequestService {
     @Transactional
     public PullRequestDetailResponse fetchPullRequest(String repositoryId, Integer prNumber, String githubToken) {
         User currentUser = authService.getCurrentUser();
-        
-        RepositoryEntity repository = repositoryRepository.findById(repositoryId)
-                .orElseThrow(() -> new ResourceNotFoundException("Repository not found with id: " + repositoryId));
-        
-        if (!repository.getUserId().equals(currentUser.getId())) {
-            throw new AccessDeniedException("You do not have access to this repository");
-        }
-        
-        String token = githubToken != null ? githubToken : currentUser.getGithubToken();
+        RepositoryEntity repository = findOwnedRepository(repositoryId, currentUser.getId());
+        String token = resolveGithubToken(githubToken, currentUser.getGithubToken(),
+            "GitHub token is required. Please provide a token or set it in your profile.");
         
         log.info("Fetching PR #{} for repository: {}", prNumber, repository.getFullName());
         
@@ -147,12 +133,11 @@ public class PullRequestService {
             pullRequests = pullRequestRepository.findByUserIdOrderByCreatedAtDesc(currentUser.getId());
         }
         
+        Map<String, String> repositoryNames = buildRepositoryNameMap(pullRequests);
+
         return pullRequests.stream()
-                .map(pr -> {
-                    RepositoryEntity repo = repositoryRepository.findById(pr.getRepositoryId()).orElse(null);
-                    return mapToResponse(pr, repo != null ? repo.getName() : "Unknown");
-                })
-                .collect(Collectors.toList());
+            .map(pr -> mapToResponse(pr, repositoryNames.getOrDefault(pr.getRepositoryId(), "Unknown")))
+            .collect(Collectors.toList());
     }
 
     /**
@@ -160,13 +145,7 @@ public class PullRequestService {
      */
     public List<PullRequestResponse> getRepositoryPullRequests(String repositoryId, String state) {
         User currentUser = authService.getCurrentUser();
-        
-        RepositoryEntity repository = repositoryRepository.findById(repositoryId)
-                .orElseThrow(() -> new ResourceNotFoundException("Repository not found with id: " + repositoryId));
-        
-        if (!repository.getUserId().equals(currentUser.getId())) {
-            throw new AccessDeniedException("You do not have access to this repository");
-        }
+        RepositoryEntity repository = findOwnedRepository(repositoryId, currentUser.getId());
         
         List<PullRequest> pullRequests;
         if (state != null && !state.isEmpty()) {
@@ -185,13 +164,7 @@ public class PullRequestService {
      */
     public PullRequestDetailResponse getPullRequestById(String id) {
         User currentUser = authService.getCurrentUser();
-        
-        PullRequest pullRequest = pullRequestRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Pull request not found with id: " + id));
-        
-        if (!pullRequest.getUserId().equals(currentUser.getId())) {
-            throw new AccessDeniedException("You do not have access to this pull request");
-        }
+        PullRequest pullRequest = findOwnedPullRequest(id, currentUser.getId());
         
         RepositoryEntity repository = repositoryRepository.findById(pullRequest.getRepositoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Repository not found"));
@@ -204,22 +177,13 @@ public class PullRequestService {
      */
     public PullRequestWithFilesResponse getPullRequestWithFiles(String id, String githubToken, boolean includeDiff) {
         User currentUser = authService.getCurrentUser();
-        
-        PullRequest pullRequest = pullRequestRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Pull request not found with id: " + id));
-        
-        if (!pullRequest.getUserId().equals(currentUser.getId())) {
-            throw new AccessDeniedException("You do not have access to this pull request");
-        }
+        PullRequest pullRequest = findOwnedPullRequest(id, currentUser.getId());
         
         RepositoryEntity repository = repositoryRepository.findById(pullRequest.getRepositoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Repository not found"));
         
-        String token = githubToken != null ? githubToken : currentUser.getGithubToken();
-        
-        if (token == null || token.isEmpty()) {
-            throw new GithubApiException("GitHub token is required to fetch pull request details");
-        }
+        String token = resolveGithubToken(githubToken, currentUser.getGithubToken(),
+            "GitHub token is required to fetch pull request details");
         
         log.info("Fetching PR #{} details with files from GitHub for repository: {}", 
                 pullRequest.getPrNumber(), repository.getFullName());
@@ -292,18 +256,48 @@ public class PullRequestService {
      */
     public long getRepositoryPullRequestCount(String repositoryId, String state) {
         User currentUser = authService.getCurrentUser();
-        
-        RepositoryEntity repository = repositoryRepository.findById(repositoryId)
-                .orElseThrow(() -> new ResourceNotFoundException("Repository not found with id: " + repositoryId));
-        
-        if (!repository.getUserId().equals(currentUser.getId())) {
-            throw new AccessDeniedException("You do not have access to this repository");
-        }
+        findOwnedRepository(repositoryId, currentUser.getId());
         
         if (state != null && !state.isEmpty()) {
             return pullRequestRepository.countByRepositoryIdAndState(repositoryId, state);
         }
         return pullRequestRepository.countByRepositoryId(repositoryId);
+    }
+
+    private RepositoryEntity findOwnedRepository(String repositoryId, String userId) {
+        return repositoryRepository.findByIdAndUserId(repositoryId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Repository not found with id: " + repositoryId));
+    }
+
+    private PullRequest findOwnedPullRequest(String pullRequestId, String userId) {
+        return pullRequestRepository.findByIdAndUserId(pullRequestId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pull request not found with id: " + pullRequestId));
+    }
+
+    private String resolveGithubToken(String requestToken, String userToken, String errorMessage) {
+        String token = (requestToken != null && !requestToken.isBlank()) ? requestToken : userToken;
+        if (token == null || token.isBlank()) {
+            throw new GithubApiException(errorMessage);
+        }
+        return token;
+    }
+
+    private Map<String, String> buildRepositoryNameMap(List<PullRequest> pullRequests) {
+        if (pullRequests.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Set<String> repositoryIds = pullRequests.stream()
+                .map(PullRequest::getRepositoryId)
+                .collect(Collectors.toSet());
+
+        List<RepositoryEntity> repositories = repositoryRepository.findAllById(repositoryIds);
+        Map<String, String> repositoryNames = new HashMap<>();
+        for (RepositoryEntity repository : repositories) {
+            repositoryNames.put(repository.getId(), repository.getName());
+        }
+
+        return repositoryNames;
     }
 
     /**
