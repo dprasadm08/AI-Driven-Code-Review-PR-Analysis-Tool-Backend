@@ -24,6 +24,8 @@ import com.aiprreview.exception.ResourceNotFoundException;
 import com.aiprreview.repository.UserRepository;
 import com.aiprreview.service.AnalysisService;
 import com.aiprreview.service.PullRequestService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +46,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/analysis")
 @RequiredArgsConstructor
+@Tag(name = "Analysis", description = "AI-powered code review and analysis for pull requests")
 public class AnalysisController {
 
     private final OpenAiService openAiService;

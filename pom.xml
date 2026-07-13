@@ -20,6 +20,7 @@
     <properties>
         <java.version>17</java.version>
         <jwt.version>0.12.5</jwt.version>
+        <springdoc.version>2.5.0</springdoc.version>
     </properties>
     
     <dependencies>
@@ -84,6 +85,13 @@
             <version>4.1.1</version>
         </dependency>
         
+        <!-- SpringDoc OpenAPI / Swagger UI -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+
         <!-- Dev Tools -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

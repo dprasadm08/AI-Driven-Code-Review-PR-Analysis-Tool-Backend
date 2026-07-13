@@ -5,6 +5,8 @@ import com.aiprreview.dto.webhook.GithubWebhookPayload;
 import com.aiprreview.exception.UnauthorizedException;
 import com.aiprreview.service.WebhookService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +18,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/webhooks")
 @RequiredArgsConstructor
+@Tag(name = "Webhooks", description = "GitHub webhook receiver for pull request events")
 public class WebhookController {
 
     private final WebhookService webhookService;

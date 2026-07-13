@@ -5,6 +5,8 @@ import com.aiprreview.dto.repository.RepositoryRequest;
 import com.aiprreview.dto.repository.RepositoryResponse;
 import com.aiprreview.service.GithubService;
 import com.aiprreview.service.RepositoryService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +22,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/repositories")
 @RequiredArgsConstructor
+@Tag(name = "Repositories", description = "Repository management and GitHub sync")
 public class RepositoryController {
 
     private final RepositoryService repositoryService;

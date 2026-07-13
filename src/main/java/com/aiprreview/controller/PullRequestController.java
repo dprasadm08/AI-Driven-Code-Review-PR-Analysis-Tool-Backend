@@ -5,6 +5,8 @@ import com.aiprreview.dto.pullrequest.PullRequestDetailResponse;
 import com.aiprreview.dto.pullrequest.PullRequestResponse;
 import com.aiprreview.dto.pullrequest.PullRequestWithFilesResponse;
 import com.aiprreview.service.PullRequestService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -19,6 +21,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/pull-requests")
 @RequiredArgsConstructor
+@Tag(name = "Pull Requests", description = "Pull request listing, details, and GitHub sync")
 public class PullRequestController {
 
     private final PullRequestService pullRequestService;

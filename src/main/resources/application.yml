@@ -6,16 +6,27 @@ server:
 spring:
   application:
     name: ai-pr-review-backend
-  
+
   data:
     mongodb:
-      uri: mongodb://localhost:27017/ai-pr-review
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://localhost:27017/ai-pr-review}
       auto-index-creation: true
-  
+
+  # Remove default in-memory user (app uses JWT/MongoDB auth)
   security:
     user:
-      name: admin
-      password: admin123
+      name: ${SPRING_SECURITY_USER_NAME:disabled}
+      password: ${SPRING_SECURITY_USER_PASSWORD:disabled}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+    display-request-duration: true
+  show-actuator: false
 
 app:
   jwt:
