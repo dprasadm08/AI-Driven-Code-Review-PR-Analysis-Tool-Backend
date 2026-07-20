@@ -8,11 +8,15 @@ import com.aiprreview.service.RepositoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,6 +26,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/repositories")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Repositories", description = "Repository management and GitHub sync")
 public class RepositoryController {
 
@@ -50,7 +55,7 @@ public class RepositoryController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<ApiResponse<RepositoryResponse>> getRepositoryById(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<RepositoryResponse>> getRepositoryById(@PathVariable @NotBlank String id) {
         log.info("Fetching repository with id: {}", id);
         RepositoryResponse response = repositoryService.getRepositoryById(id);
         return ResponseEntity.ok(ApiResponse.success("Repository fetched successfully", response));
@@ -58,7 +63,11 @@ public class RepositoryController {
 
     @GetMapping("/name/{fullName}")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<ApiResponse<RepositoryResponse>> getRepositoryByFullName(@PathVariable String fullName) {
+    public ResponseEntity<ApiResponse<RepositoryResponse>> getRepositoryByFullName(
+            @PathVariable
+            @NotBlank
+            @Pattern(regexp = "^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$", message = "fullName must be in format 'owner/repo'")
+            String fullName) {
         log.info("Fetching repository: {}", fullName);
         RepositoryResponse response = repositoryService.getRepositoryByFullName(fullName);
         return ResponseEntity.ok(ApiResponse.success("Repository fetched successfully", response));
@@ -67,7 +76,7 @@ public class RepositoryController {
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResponse<RepositoryResponse>> updateRepository(
-            @PathVariable String id,
+            @PathVariable @NotBlank String id,
             @Valid @RequestBody RepositoryRequest request) {
         log.info("Updating repository with id: {}", id);
         RepositoryResponse response = repositoryService.updateRepository(id, request);
@@ -76,7 +85,7 @@ public class RepositoryController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<ApiResponse<Map<String, String>>> deleteRepository(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<Map<String, String>>> deleteRepository(@PathVariable @NotBlank String id) {
         log.info("Deleting repository with id: {}", id);
         repositoryService.deleteRepository(id);
         return ResponseEntity.ok(ApiResponse.success(
@@ -87,7 +96,7 @@ public class RepositoryController {
 
     @PatchMapping("/{id}/toggle-status")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<ApiResponse<RepositoryResponse>> toggleRepositoryStatus(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<RepositoryResponse>> toggleRepositoryStatus(@PathVariable @NotBlank String id) {
         log.info("Toggling status for repository with id: {}", id);
         RepositoryResponse response = repositoryService.toggleRepositoryStatus(id);
         return ResponseEntity.ok(ApiResponse.success("Repository status updated successfully", response));
@@ -104,7 +113,7 @@ public class RepositoryController {
     @GetMapping("/search")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResponse<List<RepositoryResponse>>> searchRepositories(
-            @RequestParam String query) {
+            @RequestParam @NotBlank @Size(max = 255) String query) {
         log.info("Searching repositories with query: {}", query);
         List<RepositoryResponse> repositories = repositoryService.searchRepositories(query);
         return ResponseEntity.ok(ApiResponse.success("Repository search completed", repositories));
@@ -113,7 +122,7 @@ public class RepositoryController {
     @PostMapping("/sync/github")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> syncGithubRepositories(
-            @RequestParam(required = false) String token) {
+            @RequestParam(required = false) @Size(max = 255) String token) {
         log.info("Syncing repositories from GitHub");
         List<RepositoryResponse> repositories = githubService.syncUserRepositories(token);
         return ResponseEntity.ok(ApiResponse.success(
@@ -125,8 +134,11 @@ public class RepositoryController {
     @PostMapping("/sync/github/repo")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResponse<RepositoryResponse>> fetchGithubRepository(
-            @RequestParam String fullName,
-            @RequestParam(required = false) String token) {
+            @RequestParam
+            @NotBlank
+            @Pattern(regexp = "^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$", message = "fullName must be in format 'owner/repo'")
+            String fullName,
+            @RequestParam(required = false) @Size(max = 255) String token) {
         log.info("Fetching repository from GitHub: {}", fullName);
         RepositoryResponse repository = githubService.fetchAndSaveRepository(fullName, token);
         return ResponseEntity.status(HttpStatus.CREATED)

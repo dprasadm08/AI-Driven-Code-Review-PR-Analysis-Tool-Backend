@@ -27,6 +27,11 @@ import com.aiprreview.service.PullRequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -36,6 +41,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -46,6 +52,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/analysis")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Analysis", description = "AI-powered code review and analysis for pull requests")
 public class AnalysisController {
 
@@ -113,7 +120,7 @@ public class AnalysisController {
 
     @GetMapping("/results/{prId}")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<List<AnalysisResult>> getAnalysisResults(@PathVariable String prId) {
+    public ResponseEntity<List<AnalysisResult>> getAnalysisResults(@PathVariable @NotBlank String prId) {
         if (prId == null || prId.isBlank()) {
             throw new IllegalArgumentException("prId path variable must not be blank");
         }
@@ -125,10 +132,10 @@ public class AnalysisController {
     @GetMapping("/history")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<Map<String, Object>> getMyAnalysisHistory(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir) {
+            @RequestParam(defaultValue = "desc") @Pattern(regexp = "^(asc|desc)$", flags = Pattern.Flag.CASE_INSENSITIVE) String sortDir) {
         validatePagination(page, size);
         String userId = getCurrentUserId();
         Pageable pageable = buildPageable(page, size, sortBy, sortDir);
@@ -139,11 +146,11 @@ public class AnalysisController {
     @GetMapping("/history/pull-request/{prId}")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<Map<String, Object>> getPullRequestAnalysisHistory(
-            @PathVariable String prId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
+            @PathVariable @NotBlank String prId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir) {
+            @RequestParam(defaultValue = "desc") @Pattern(regexp = "^(asc|desc)$", flags = Pattern.Flag.CASE_INSENSITIVE) String sortDir) {
         if (prId == null || prId.isBlank()) {
             throw new IllegalArgumentException("prId path variable must not be blank");
         }
@@ -157,11 +164,11 @@ public class AnalysisController {
     @GetMapping("/history/repository/{repositoryId}")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<Map<String, Object>> getRepositoryAnalysisHistory(
-            @PathVariable String repositoryId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
+            @PathVariable @NotBlank String repositoryId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir) {
+            @RequestParam(defaultValue = "desc") @Pattern(regexp = "^(asc|desc)$", flags = Pattern.Flag.CASE_INSENSITIVE) String sortDir) {
         if (repositoryId == null || repositoryId.isBlank()) {
             throw new IllegalArgumentException("repositoryId path variable must not be blank");
         }
@@ -174,7 +181,7 @@ public class AnalysisController {
 
     @GetMapping("/status/{analysisId}")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<Map<String, Object>> getAnalysisStatus(@PathVariable String analysisId) {
+    public ResponseEntity<Map<String, Object>> getAnalysisStatus(@PathVariable @NotBlank String analysisId) {
         if (analysisId == null || analysisId.isBlank()) {
             throw new IllegalArgumentException("analysisId path variable must not be blank");
         }
@@ -194,7 +201,7 @@ public class AnalysisController {
 
     @GetMapping("/details/{analysisId}")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<Map<String, Object>> getAnalysisDetails(@PathVariable String analysisId) {
+    public ResponseEntity<Map<String, Object>> getAnalysisDetails(@PathVariable @NotBlank String analysisId) {
         if (analysisId == null || analysisId.isBlank()) {
             throw new IllegalArgumentException("analysisId path variable must not be blank");
         }
@@ -248,7 +255,9 @@ public class AnalysisController {
     @GetMapping("/test/provider")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<Map<String, Object>> testProviderSwitch(
-            @RequestParam(required = false) String provider) {
+            @RequestParam(required = false)
+            @Pattern(regexp = "^(openai|claude)?$", message = "provider must be openai or claude")
+            String provider) {
         AiProvider selected = aiProviderRouter.resolveProvider(provider);
         AiProvider.ConnectivityResult result = selected.testConnectivity();
         Map<String, Object> response = buildConnectivityResponse(result, provider);
@@ -264,9 +273,11 @@ public class AnalysisController {
     @PostMapping("/bugs/{pullRequestId}")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<BugAnalysisResult> detectBugs(
-            @PathVariable String pullRequestId,
-            @RequestParam(required = false) String provider,
-            @RequestParam(required = false) String token,
+            @PathVariable @NotBlank String pullRequestId,
+            @RequestParam(required = false)
+            @Pattern(regexp = "^(openai|claude)?$", message = "provider must be openai or claude")
+            String provider,
+            @RequestParam(required = false) @Size(max = 255) String token,
             @RequestParam(defaultValue = "false") boolean includeDiff) {
         log.info("Running bug detection on PR id={} provider={}", pullRequestId, provider);
         try {
@@ -284,9 +295,11 @@ public class AnalysisController {
     @PostMapping("/security/{pullRequestId}")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<SecurityAnalysisResult> detectSecurityVulnerabilities(
-            @PathVariable String pullRequestId,
-            @RequestParam(required = false) String provider,
-            @RequestParam(required = false) String token,
+            @PathVariable @NotBlank String pullRequestId,
+            @RequestParam(required = false)
+            @Pattern(regexp = "^(openai|claude)?$", message = "provider must be openai or claude")
+            String provider,
+            @RequestParam(required = false) @Size(max = 255) String token,
             @RequestParam(defaultValue = "false") boolean includeDiff) {
         log.info("Running security analysis on PR id={} provider={}", pullRequestId, provider);
         try {
@@ -304,9 +317,11 @@ public class AnalysisController {
     @PostMapping("/performance/{pullRequestId}")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<PerformanceAnalysisResult> detectPerformanceIssues(
-            @PathVariable String pullRequestId,
-            @RequestParam(required = false) String provider,
-            @RequestParam(required = false) String token,
+            @PathVariable @NotBlank String pullRequestId,
+            @RequestParam(required = false)
+            @Pattern(regexp = "^(openai|claude)?$", message = "provider must be openai or claude")
+            String provider,
+            @RequestParam(required = false) @Size(max = 255) String token,
             @RequestParam(defaultValue = "false") boolean includeDiff) {
         log.info("Running performance analysis on PR id={} provider={}", pullRequestId, provider);
         try {
@@ -324,9 +339,11 @@ public class AnalysisController {
     @PostMapping("/code-quality/{pullRequestId}")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<CodeQualityAnalysisResult> detectCodeSmells(
-            @PathVariable String pullRequestId,
-            @RequestParam(required = false) String provider,
-            @RequestParam(required = false) String token,
+            @PathVariable @NotBlank String pullRequestId,
+            @RequestParam(required = false)
+            @Pattern(regexp = "^(openai|claude)?$", message = "provider must be openai or claude")
+            String provider,
+            @RequestParam(required = false) @Size(max = 255) String token,
             @RequestParam(defaultValue = "false") boolean includeDiff) {
         log.info("Running code-quality analysis on PR id={} provider={}", pullRequestId, provider);
         try {
@@ -344,9 +361,11 @@ public class AnalysisController {
     @PostMapping("/test-cases/{pullRequestId}")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<TestCaseAnalysisResult> analyzeTestCoverage(
-            @PathVariable String pullRequestId,
-            @RequestParam(required = false) String provider,
-            @RequestParam(required = false) String token,
+            @PathVariable @NotBlank String pullRequestId,
+            @RequestParam(required = false)
+            @Pattern(regexp = "^(openai|claude)?$", message = "provider must be openai or claude")
+            String provider,
+            @RequestParam(required = false) @Size(max = 255) String token,
             @RequestParam(defaultValue = "false") boolean includeDiff) {
         log.info("Running test-case analysis on PR id={} provider={}", pullRequestId, provider);
         try {
@@ -364,9 +383,11 @@ public class AnalysisController {
     @PostMapping("/full/{pullRequestId}")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<UnifiedAnalysisResponse> runUnifiedAnalysis(
-            @PathVariable String pullRequestId,
-            @RequestParam(required = false) String provider,
-            @RequestParam(required = false) String token,
+            @PathVariable @NotBlank String pullRequestId,
+            @RequestParam(required = false)
+            @Pattern(regexp = "^(openai|claude)?$", message = "provider must be openai or claude")
+            String provider,
+            @RequestParam(required = false) @Size(max = 255) String token,
             @RequestParam(defaultValue = "false") boolean includeDiff) {
         log.info("Running unified analysis on PR id={} provider={}", pullRequestId, provider);
         try {
