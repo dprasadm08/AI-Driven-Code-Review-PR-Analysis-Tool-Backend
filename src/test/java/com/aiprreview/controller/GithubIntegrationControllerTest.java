@@ -5,16 +5,14 @@ import com.aiprreview.exception.GithubApiException;
 import com.aiprreview.exception.GlobalExceptionHandler;
 import com.aiprreview.service.GithubService;
 import com.aiprreview.service.RepositoryService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
@@ -23,23 +21,26 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = RepositoryController.class)
-@AutoConfigureMockMvc(addFilters = false)
-@Import(GlobalExceptionHandler.class)
-@TestPropertySource(properties = "server.servlet.context-path=")
+@ExtendWith(MockitoExtension.class)
 class GithubIntegrationControllerTest {
 
-    @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+        @Mock
     private RepositoryService repositoryService;
 
-    @MockBean
+        @Mock
     private GithubService githubService;
 
+        @BeforeEach
+        void setUp() {
+                RepositoryController controller = new RepositoryController(repositoryService, githubService);
+                mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                                .setControllerAdvice(new GlobalExceptionHandler())
+                                .build();
+        }
+
     @Test
-    @WithMockUser(roles = "USER")
     void syncGithubRepositories_ShouldReturnSyncedRepositories() throws Exception {
         RepositoryResponse repo = RepositoryResponse.builder()
                 .id("r1")
@@ -63,7 +64,6 @@ class GithubIntegrationControllerTest {
     }
 
     @Test
-    @WithMockUser(roles = "USER")
     void fetchGithubRepository_ShouldReturnCreatedRepository() throws Exception {
         RepositoryResponse repo = RepositoryResponse.builder()
                 .id("r99")
@@ -85,7 +85,6 @@ class GithubIntegrationControllerTest {
     }
 
     @Test
-    @WithMockUser(roles = "USER")
     void syncGithubRepositories_ShouldReturnBadGateway_WhenGithubFails() throws Exception {
         when(githubService.syncUserRepositories(null))
                 .thenThrow(new GithubApiException("GitHub API unavailable"));

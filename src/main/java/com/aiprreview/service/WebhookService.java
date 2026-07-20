@@ -35,7 +35,7 @@ public class WebhookService {
     private final PullRequestRepository pullRequestRepository;    private final UnifiedAnalysisService unifiedAnalysisService;
     private final WebhookAnalysisConfig webhookAnalysisConfig;    private final ObjectMapper objectMapper;
 
-    @Value(\"${app.github.webhook.secret:}\")
+    @Value("${app.github.webhook.secret:}")
     private String webhookSecret;
 
     /**
@@ -43,29 +43,29 @@ public class WebhookService {
      */
     public boolean validateSignature(String payload, String signature) {
         if (webhookSecret == null || webhookSecret.isEmpty()) {
-            log.warn(\"Webhook secret is not configured. Signature validation will be skipped.\");
+            log.warn("Webhook secret is not configured. Signature validation will be skipped.");
             return true; // Allow webhook if secret is not configured (for development)
         }
 
-        if (signature == null || !signature.startsWith(\"sha256=\")) {
-            log.error(\"Invalid signature format: {}\", signature);
+        if (signature == null || !signature.startsWith("sha256=")) {
+            log.error("Invalid signature format: {}", signature);
             return false;
         }
 
         try {
-            String receivedSignature = signature.substring(7); // Remove \"sha256=\" prefix
+            String receivedSignature = signature.substring(7); // Remove "sha256=" prefix
             String calculatedSignature = calculateHmacSha256(payload, webhookSecret);
             
             boolean isValid = receivedSignature.equalsIgnoreCase(calculatedSignature);
             
             if (!isValid) {
-                log.error(\"Signature validation failed. Expected: {}, Received: {}\", 
+                log.error("Signature validation failed. Expected: {}, Received: {}", 
                         calculatedSignature, receivedSignature);
             }
             
             return isValid;
         } catch (Exception ex) {
-            log.error(\"Error validating webhook signature\", ex);
+            log.error("Error validating webhook signature", ex);
             return false;
         }
     }
@@ -75,8 +75,8 @@ public class WebhookService {
      */
     private String calculateHmacSha256(String data, String key) 
             throws NoSuchAlgorithmException, InvalidKeyException {
-        Mac mac = Mac.getInstance(\"HmacSHA256\");
-        SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), \"HmacSHA256\");
+        Mac mac = Mac.getInstance("HmacSHA256");
+        SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
         mac.init(secretKeySpec);
         byte[] hash = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
         return HexFormat.of().formatHex(hash);
@@ -86,7 +86,7 @@ public class WebhookService {
      * Handle pull request webhook event
      */
     public void handlePullRequestEvent(String eventType, GithubWebhookPayload payload, String rawPayload) {
-        log.info(\"Processing pull_request event: action={}, repo={}, pr#{}\",
+        log.info("Processing pull_request event: action={}, repo={}, pr#{}",
                 payload.getAction(),
                 payload.getRepository().getFullName(),
                 payload.getPullRequest().getNumber());
@@ -100,7 +100,7 @@ public class WebhookService {
                 .pullRequestNumber(payload.getPullRequest().getNumber())
                 .pullRequestId(payload.getPullRequest().getId())
                 .payload(rawPayload)
-                .status(\"processing\")
+                .status("processing")
                 .sender(payload.getSender().getLogin())
                 .receivedAt(LocalDateTime.now())
                 .createdAt(LocalDateTime.now())
@@ -111,29 +111,29 @@ public class WebhookService {
         try {
             // Process based on action
             switch (payload.getAction()) {
-                case \"opened\":
+                case "opened":
                     handlePullRequestOpened(payload, webhookEvent);
                     break;
-                case \"synchronize\":
+                case "synchronize":
                     handlePullRequestSynchronize(payload, webhookEvent);
                     break;
-                case \"closed\":
+                case "closed":
                     handlePullRequestClosed(payload, webhookEvent);
                     break;
-                case \"reopened\":
+                case "reopened":
                     handlePullRequestReopened(payload, webhookEvent);
                     break;
                 default:
-                    log.info(\"Unhandled pull_request action: {}\", payload.getAction());
-                    webhookEvent.setStatus(\"processed\");
+                    log.info("Unhandled pull_request action: {}", payload.getAction());
+                    webhookEvent.setStatus("processed");
             }
 
             webhookEvent.setProcessedAt(LocalDateTime.now());
             webhookEventRepository.save(webhookEvent);
 
         } catch (Exception ex) {
-            log.error(\"Error processing pull_request webhook\", ex);
-            webhookEvent.setStatus(\"failed\");
+            log.error("Error processing pull_request webhook", ex);
+            webhookEvent.setStatus("failed");
             webhookEvent.setErrorMessage(ex.getMessage());
             webhookEvent.setProcessedAt(LocalDateTime.now());
             webhookEventRepository.save(webhookEvent);
@@ -144,7 +144,7 @@ public class WebhookService {
      * Handle pull request opened event
      */
     private void handlePullRequestOpened(GithubWebhookPayload payload, WebhookEvent webhookEvent) {
-        log.info(\"Handling PR opened: #{} - {}\", 
+        log.info("Handling PR opened: #{} - {}", 
                 payload.getPullRequest().getNumber(), 
                 payload.getPullRequest().getTitle());
 
@@ -155,10 +155,10 @@ public class WebhookService {
                 .findFirst();
 
         if (repositoryOpt.isEmpty()) {
-            log.warn(\"Repository not found in database: {}. Webhook event saved but not processed.\",
+            log.warn("Repository not found in database: {}. Webhook event saved but not processed.",
                     payload.getRepository().getFullName());
-            webhookEvent.setStatus(\"processed\");
-            webhookEvent.setErrorMessage(\"Repository not found in database\");
+            webhookEvent.setStatus("processed");
+            webhookEvent.setErrorMessage("Repository not found in database");
             return;
         }
 
@@ -169,8 +169,8 @@ public class WebhookService {
                 .findByRepositoryIdAndPrNumber(repository.getId(), payload.getPullRequest().getNumber());
 
         if (existingPR.isPresent()) {
-            log.info(\"Pull request already exists in database: #{}\", payload.getPullRequest().getNumber());
-            webhookEvent.setStatus(\"processed\");
+            log.info("Pull request already exists in database: #{}", payload.getPullRequest().getNumber());
+            webhookEvent.setStatus("processed");
             return;
         }
 
@@ -192,7 +192,7 @@ public class WebhookService {
                 .baseSha(payload.getPullRequest().getBase().getSha())
                 .isDraft(payload.getPullRequest().getDraft())
                 .isMerged(payload.getPullRequest().getMerged())
-                .analysisStatus(\"pending\")
+                .analysisStatus("pending")
                 .lastSyncedAt(LocalDateTime.now())
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -200,7 +200,7 @@ public class WebhookService {
 
         pullRequest = pullRequestRepository.save(pullRequest);
 
-        log.info(\"Successfully created pull request from webhook: #{} (ID: {})\",
+        log.info("Successfully created pull request from webhook: #{} (ID: {})",
                 pullRequest.getPrNumber(), pullRequest.getId());
         // Trigger automatic analysis asynchronously
         triggerAutomaticAnalysis(
@@ -208,14 +208,14 @@ public class WebhookService {
                 payload.getAction(),
                 payload.getRepository().getFullName()
         );
-        webhookEvent.setStatus(\"processed\");
+        webhookEvent.setStatus("processed");
     }
 
     /**
      * Handle pull request synchronize event (new commits pushed)
      */
     private void handlePullRequestSynchronize(GithubWebhookPayload payload, WebhookEvent webhookEvent) {
-        log.info(\"Handling PR synchronize: #{}\", payload.getPullRequest().getNumber());
+        log.info("Handling PR synchronize: #{}", payload.getPullRequest().getNumber());
 
         Optional<RepositoryEntity> repositoryOpt = repositoryRepository
                 .findByFullName(payload.getRepository().getFullName())
@@ -223,8 +223,8 @@ public class WebhookService {
                 .findFirst();
 
         if (repositoryOpt.isEmpty()) {
-            webhookEvent.setStatus(\"processed\");
-            webhookEvent.setErrorMessage(\"Repository not found in database\");
+            webhookEvent.setStatus("processed");
+            webhookEvent.setErrorMessage("Repository not found in database");
             return;
         }
 
@@ -234,9 +234,9 @@ public class WebhookService {
                 .findByRepositoryIdAndPrNumber(repository.getId(), payload.getPullRequest().getNumber());
 
         if (prOpt.isEmpty()) {
-            log.warn(\"Pull request not found: #{}\", payload.getPullRequest().getNumber());
-            webhookEvent.setStatus(\"processed\");
-            webhookEvent.setErrorMessage(\"Pull request not found in database\");
+            log.warn("Pull request not found: #{}", payload.getPullRequest().getNumber());
+            webhookEvent.setStatus("processed");
+            webhookEvent.setErrorMessage("Pull request not found in database");
             return;
         }
 
@@ -246,25 +246,25 @@ public class WebhookService {
         pullRequest.setUpdatedAt(LocalDateTime.now());
         pullRequest.setLastSyncedAt(LocalDateTime.now());
         // Reset analysis status since code changed
-        pullRequest.setAnalysisStatus(\"pending\");
+        pullRequest.setAnalysisStatus("pending");
 
         pullRequestRepository.save(pullRequest);
 
-        log.info(\"Updated pull request from synchronize event: #{}\", pullRequest.getPrNumber());
+        log.info("Updated pull request from synchronize event: #{}", pullRequest.getPrNumber());
         // Trigger automatic analysis asynchronously
         triggerAutomaticAnalysis(
                 pullRequest.getId(),
                 payload.getAction(),
                 payload.getRepository().getFullName()
         );
-        webhookEvent.setStatus(\"processed\");
+        webhookEvent.setStatus("processed");
     }
 
     /**
      * Handle pull request closed event
      */
     private void handlePullRequestClosed(GithubWebhookPayload payload, WebhookEvent webhookEvent) {
-        log.info(\"Handling PR closed: #{}, merged={}\", 
+        log.info("Handling PR closed: #{}, merged={}", 
                 payload.getPullRequest().getNumber(),
                 payload.getPullRequest().getMerged());
 
@@ -274,7 +274,7 @@ public class WebhookService {
                 .findFirst();
 
         if (repositoryOpt.isEmpty()) {
-            webhookEvent.setStatus(\"processed\");
+            webhookEvent.setStatus("processed");
             return;
         }
 
@@ -284,12 +284,12 @@ public class WebhookService {
                 .findByRepositoryIdAndPrNumber(repository.getId(), payload.getPullRequest().getNumber());
 
         if (prOpt.isEmpty()) {
-            webhookEvent.setStatus(\"processed\");
+            webhookEvent.setStatus("processed");
             return;
         }
 
         PullRequest pullRequest = prOpt.get();
-        pullRequest.setState(payload.getPullRequest().getMerged() ? \"merged\" : \"closed\");
+        pullRequest.setState(payload.getPullRequest().getMerged() ? "merged" : "closed");
         pullRequest.setIsMerged(payload.getPullRequest().getMerged());
         pullRequest.setClosedAt(LocalDateTime.now());
         pullRequest.setUpdatedAt(LocalDateTime.now());
@@ -300,15 +300,15 @@ public class WebhookService {
 
         pullRequestRepository.save(pullRequest);
 
-        log.info(\"Updated pull request state to {}: #{}\", pullRequest.getState(), pullRequest.getPrNumber());
-        webhookEvent.setStatus(\"processed\");
+        log.info("Updated pull request state to {}: #{}", pullRequest.getState(), pullRequest.getPrNumber());
+        webhookEvent.setStatus("processed");
     }
 
     /**
      * Handle pull request reopened event
      */
     private void handlePullRequestReopened(GithubWebhookPayload payload, WebhookEvent webhookEvent) {
-        log.info(\"Handling PR reopened: #{}\", payload.getPullRequest().getNumber());
+        log.info("Handling PR reopened: #{}", payload.getPullRequest().getNumber());
 
         Optional<RepositoryEntity> repositoryOpt = repositoryRepository
                 .findByFullName(payload.getRepository().getFullName())
@@ -316,7 +316,7 @@ public class WebhookService {
                 .findFirst();
 
         if (repositoryOpt.isEmpty()) {
-            webhookEvent.setStatus(\"processed\");
+            webhookEvent.setStatus("processed");
             return;
         }
 
@@ -326,24 +326,24 @@ public class WebhookService {
                 .findByRepositoryIdAndPrNumber(repository.getId(), payload.getPullRequest().getNumber());
 
         if (prOpt.isEmpty()) {
-            webhookEvent.setStatus(\"processed\");
+            webhookEvent.setStatus("processed");
             return;
         }
 
         PullRequest pullRequest = prOpt.get();
-        pullRequest.setState(\"open\");
+        pullRequest.setState("open");
         pullRequest.setUpdatedAt(LocalDateTime.now());
 
         pullRequestRepository.save(pullRequest);
 
-        log.info(\"Reopened pull request: #{}\", pullRequest.getPrNumber());
+        log.info("Reopened pull request: #{}", pullRequest.getPrNumber());
         // Trigger automatic analysis asynchronously
         triggerAutomaticAnalysis(
                 pullRequest.getId(),
                 payload.getAction(),
                 payload.getRepository().getFullName()
         );
-        webhookEvent.setStatus(\"processed\");
+        webhookEvent.setStatus("processed");
     }
 
     /**

@@ -2,15 +2,15 @@ package com.aiprreview.controller;
 
 import com.aiprreview.exception.GlobalExceptionHandler;
 import com.aiprreview.service.WebhookService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.test.web.servlet.MockMvc;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -21,17 +21,21 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = WebhookController.class)
-@AutoConfigureMockMvc(addFilters = false)
-@Import(GlobalExceptionHandler.class)
-@TestPropertySource(properties = "server.servlet.context-path=")
+@ExtendWith(MockitoExtension.class)
 class WebhookControllerTest {
 
-    @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+  @Mock
     private WebhookService webhookService;
+
+  @BeforeEach
+  void setUp() {
+    WebhookController controller = new WebhookController(webhookService, new ObjectMapper());
+    mockMvc = MockMvcBuilders.standaloneSetup(controller)
+        .setControllerAdvice(new GlobalExceptionHandler())
+        .build();
+  }
 
     @Test
     void testWebhookEndpoint_ShouldReturnReadyStatus() throws Exception {

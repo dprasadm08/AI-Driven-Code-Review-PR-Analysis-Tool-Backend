@@ -9,7 +9,7 @@ import io.netty.handler.timeout.WriteTimeoutHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
@@ -76,13 +76,17 @@ public class ClaudeService implements AiProvider {
 		} catch (WebClientResponseException ex) {
 			log.error("Claude API error: status={} body={}", ex.getStatusCode(), ex.getResponseBodyAsString());
 			throw new ClaudeException("Claude API returned error " + ex.getStatusCode() + ": " + ex.getResponseBodyAsString(), ex);
-		} catch (TimeoutException ex) {
-			throw new ClaudeException(
-					"Claude request timed out after " + claudeConfig.getTimeoutSeconds() + " seconds", ex);
 		} catch (WebClientRequestException ex) {
 			throw new ClaudeException("Network error calling Claude API: " + ex.getMessage(), ex);
 		} catch (ClaudeException ex) {
 			throw ex;
+		} catch (RuntimeException ex) {
+			if (hasCause(ex, TimeoutException.class)) {
+				throw new ClaudeException(
+						"Claude request timed out after " + claudeConfig.getTimeoutSeconds() + " seconds", ex);
+			}
+			log.error("Unexpected runtime error calling Claude", ex);
+			throw new ClaudeException("Failed to call Claude API: " + ex.getMessage(), ex);
 		} catch (Exception ex) {
 			log.error("Unexpected error calling Claude", ex);
 			throw new ClaudeException("Failed to call Claude API: " + ex.getMessage(), ex);
@@ -175,10 +179,21 @@ public class ClaudeService implements AiProvider {
 			return true;
 		}
 		if (throwable instanceof WebClientResponseException ex) {
-			HttpStatus status = ex.getStatusCode();
+			HttpStatusCode status = ex.getStatusCode();
 			return status.is5xxServerError()
 					|| status.value() == 429
 					|| status.value() == 408;
+		}
+		return false;
+	}
+
+	private boolean hasCause(Throwable throwable, Class<? extends Throwable> causeType) {
+		Throwable current = throwable;
+		while (current != null) {
+			if (causeType.isInstance(current)) {
+				return true;
+			}
+			current = current.getCause();
 		}
 		return false;
 	}
